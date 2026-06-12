@@ -1,0 +1,21 @@
+task_name: async-agentic-rl
+objective: "Design an async agentic RL pipeline that trains against OpenAI-compatible tool-calling environments."
+target_frameworks: [areal, roll]
+reference_frameworks: [verl, slime, sglang, vllm]
+components: [agentic, rollout, reward, async-pipeline, environment, scheduler]
+review_mode: humanize-compatible-rlcr
+builder: claude
+reviewer: codex
+deliverables: [docs/goal.md, docs/draft.md, docs/plan.md, docs/architecture.md, docs/interfaces.md, docs/validation_matrix.md, docs/risk_register.md, docs/codex_tasks.md]
+constraints:
+  - "Separate environment API from trainer API."
+  - "Include failure modes for hanging tools, delayed rewards, partial trajectories, and stale policy."
+required_wiki_queries:
+  - "async agentic RL tool calling rollout"
+  - "AReaL base_url black-box agent application"
+  - "ROLL Ray multi-role rollout"
+validation_commands:
+  - "python .agents/skills/RLInfraWiki/scripts/query.py 'async agentic RL tool calling rollout' --limit 8"
+promotion_criteria:
+  - "Plan includes scheduler, timeout, reward aggregation, retry, tracing, sample lifecycle, and stale-policy handling."
+  - "Codex review has no unresolved P0/P1 issues."

@@ -1,0 +1,13 @@
+repos:
+  - repo: local
+    hooks:
+      - id: rlinfra-validate
+        name: RLInfraWiki validate
+        entry: python .agents/skills/RLInfraWiki/scripts/validate.py
+        language: system
+        pass_filenames: false
+      - id: rlinfra-index-check
+        name: RLInfraWiki generated index check
+        entry: python .agents/skills/RLInfraWiki/scripts/generate_indices.py --check
+        language: system
+        pass_filenames: false

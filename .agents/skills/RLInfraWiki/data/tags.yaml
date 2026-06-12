@@ -1,0 +1,8 @@
+frameworks: [slime, verl, areal, roll, vllm, sglang, megatron-lm]
+backends: [sglang, vllm, megatron, fsdp, ray, openai-compatible]
+components: [training, rollout, router, data-buffer, weight-sync, reward, verifier, environment, scheduler, observability, checkpoint, trainer, inference]
+algorithms: [ppo, grpo, gspo, dapo, reinforce-plus-plus, rloo, dpo, rlvr, rlhf]
+deployment_modes: [colocated, disaggregated, async, external-service, ray-multirole, hybrid]
+confidence: [verified, source-reported, inferred, experimental]
+reproducibility: [concept, pseudocode, snippet, runnable, benchmarked]
+risks: [stale-policy, version-mismatch, partial-weight-update, nondeterminism, cache-staleness, long-tail-rollout, reward-delay, observability-gap, rollback-gap, provenance-gap]

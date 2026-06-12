@@ -1,0 +1,8 @@
+repos:
+  slime: repo-thudm-slime-readme
+  verl: repo-verl-readme
+  areal: repo-inclusionai-areal-readme
+  roll: repo-alibaba-roll-readme
+  vllm: repo-vllm-readme
+  sglang: repo-sglang-readme
+  megatron-lm: repo-nvidia-megatron-lm-readme

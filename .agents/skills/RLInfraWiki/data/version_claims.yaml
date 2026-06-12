@@ -1,0 +1,29 @@
+version_claims:
+  vs-slime-main-2026-06-12:
+    source_ids: [repo-thudm-slime-readme]
+    upstream_commit: 0efcab0125eeaf45805b710cb5a84befb75d712c
+    captured_at: "2026-06-12"
+  vs-verl-main-2026-06-12:
+    source_ids: [repo-verl-readme]
+    upstream_commit: dbbf0853fd322f1b7e8f5b2839a1178790c0b40e
+    captured_at: "2026-06-12"
+  vs-areal-main-2026-06-12:
+    source_ids: [repo-inclusionai-areal-readme]
+    upstream_commit: 67bc932cc2e214ffa6cbd26eb640e16e5dc977b5
+    captured_at: "2026-06-12"
+  vs-roll-main-2026-06-12:
+    source_ids: [repo-alibaba-roll-readme]
+    upstream_commit: ef2f5a4db0aa5c3566ea31b4aec9bb47c26d1c33
+    captured_at: "2026-06-12"
+  vs-vllm-main-2026-06-12:
+    source_ids: [repo-vllm-readme, doc-vllm-training-weight-transfer]
+    upstream_commit: 462ef83d58e6fadeb6e216dc583554a6980a0af9
+    captured_at: "2026-06-12"
+  vs-sglang-main-2026-06-12:
+    source_ids: [repo-sglang-readme, doc-sglang-faq-determinism, doc-sglang-pd-disaggregation]
+    upstream_commit: 694cea8656373bbef2d1073cab92a6a6857c3d63
+    captured_at: "2026-06-12"
+  vs-megatron-main-2026-06-12:
+    source_ids: [repo-nvidia-megatron-lm-readme, doc-megatron-fsdp]
+    upstream_commit: de6305c0ae1e78e04929b7b6d55910ae71046ae8
+    captured_at: "2026-06-12"

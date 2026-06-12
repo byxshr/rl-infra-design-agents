@@ -1,0 +1,21 @@
+task_name: rollout-backend-selection
+objective: "Compare vLLM and SGLang as rollout engines for RLHF/RLVR/agentic RL infrastructure."
+target_frameworks: [verl, slime, roll, areal]
+reference_frameworks: [vllm, sglang]
+components: [rollout, serving, scheduler, router, weight-sync]
+review_mode: humanize-compatible-rlcr
+builder: claude
+reviewer: codex
+deliverables: [docs/goal.md, docs/draft.md, docs/plan.md, docs/comparison.md, docs/validation_matrix.md, docs/risk_register.md]
+constraints:
+  - "No benchmark claim without hardware, source, model, workload, and commit."
+  - "Include batch RLVR and multi-turn agentic cases."
+required_wiki_queries:
+  - "vLLM SGLang rollout backend RL"
+  - "SGLang RL systems refit pause resume"
+  - "vLLM PagedAttention continuous batching"
+validation_commands:
+  - "python .agents/skills/RLInfraWiki/scripts/query.py 'vLLM SGLang rollout backend RL' --limit 8"
+promotion_criteria:
+  - "Decision matrix includes throughput, latency, prefix caching, multi-turn, weight update, deterministic inference, operational complexity, and production alignment."
+  - "Codex review has no unresolved P0/P1 issues."

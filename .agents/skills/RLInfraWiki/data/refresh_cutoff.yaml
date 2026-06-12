@@ -1,0 +1,3 @@
+refresh_cutoff: "2026-06-12"
+policy: monthly
+notes: "Initial source capture from local clones in the parent workspace."

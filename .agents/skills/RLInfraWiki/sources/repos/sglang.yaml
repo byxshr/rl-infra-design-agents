@@ -1,0 +1,22 @@
+id: repo-sglang-readme
+name: SGLang README
+source_category: upstream-repo
+repo: sgl-project/sglang
+local_path: ../sglang
+captured_at: "2026-06-12"
+upstream_ref: main
+upstream_commit: 694cea8656373bbef2d1073cab92a6a6857c3d63
+license: Apache-2.0
+status: active
+trust_level: primary
+refresh_policy: monthly
+relevance:
+  - "RadixAttention prefix caching"
+  - "prefill-decode disaggregation"
+  - "RL and post-training backbone"
+  - "deterministic inference mode and router"
+key_paths:
+  - README.md
+  - docs/references/faq.md
+  - docs_new/docs/references/
+claim_ids: []

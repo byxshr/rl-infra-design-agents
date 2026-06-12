@@ -1,0 +1,13 @@
+task_name: training-rollout-mismatch-debug
+objective: "Design a debugging workflow for training/rollout logprob and policy-version mismatch in an RL pipeline."
+target_frameworks: [slime, verl]
+reference_frameworks: [vllm, sglang, megatron-lm]
+components: [training, rollout, observability, weight-sync]
+review_mode: humanize-compatible-rlcr
+builder: claude
+reviewer: codex
+deliverables: [docs/goal.md, docs/draft.md, docs/plan.md, docs/validation_matrix.md, docs/risk_register.md]
+constraints: ["Evidence must include exact config, policy version, token IDs, logprobs, and source IDs."]
+required_wiki_queries: ["training inference mismatch logprob", "rollout training mismatch SGLang vLLM"]
+validation_commands: ["python .agents/skills/RLInfraWiki/scripts/query.py 'training inference mismatch logprob' --limit 8"]
+promotion_criteria: ["Debug plan covers tokenization, cache, precision, routing, versioning, and replay evidence."]

@@ -1,0 +1,18 @@
+id: doc-sglang-pd-disaggregation
+name: SGLang PD disaggregation docs
+source_category: upstream-doc
+repo: sgl-project/sglang
+local_path: ../sglang/docs_new/docs/references/multi_node_deployment/lws_pd/lws_pd_deploy.mdx
+captured_at: "2026-06-12"
+upstream_ref: main
+upstream_commit: 694cea8656373bbef2d1073cab92a6a6857c3d63
+license: see-upstream
+status: active
+trust_level: primary
+refresh_policy: monthly
+relevance:
+  - "prefill decode separation"
+  - "router-based PD deployment"
+key_paths:
+  - ../sglang/docs_new/docs/references/multi_node_deployment/lws_pd/lws_pd_deploy.mdx
+claim_ids: []

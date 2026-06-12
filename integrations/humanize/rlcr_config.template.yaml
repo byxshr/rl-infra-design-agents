@@ -1,0 +1,20 @@
+mode: humanize-compatible-rlcr
+builder: claude
+reviewer: codex
+human_architect_required_for:
+  - goal_amendment
+  - P1_waiver
+  - promotion_with_unresolved_P2
+plan_lock:
+  enabled: true
+  file: .humanize/plan.lock.md
+review:
+  packet_script: .agents/skills/RLInfraWiki/scripts/render_rlcr_context.py
+  parse_script: .agents/skills/RLInfraWiki/scripts/parse_codex_review.py
+  gate_script: .agents/skills/RLInfraWiki/scripts/validate_review_gate.py
+  blocker_severities: [P0, P1]
+  waiver_allowed_for: [P2]
+  backlog_allowed_for: [P3]
+validation:
+  require_before_review: true
+  require_after_fix: true

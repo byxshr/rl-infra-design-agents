@@ -1,0 +1,17 @@
+frameworks:
+  slime:
+    training_backends: [megatron]
+    rollout_backends: [sglang]
+    focus: "Megatron plus SGLang post-training path with Data Buffer and native engine pass-through."
+  verl:
+    training_backends: [fsdp, fsdp2, megatron-lm]
+    rollout_backends: [vllm, sglang, hf-transformers]
+    focus: "Hybrid-controller RL dataflows with multiple training and rollout backends."
+  areal:
+    training_backends: [fsdp, megatron]
+    rollout_backends: [sglang, vllm]
+    focus: "Fully asynchronous RL and agentic workflows through OpenAI-compatible proxy patterns."
+  roll:
+    training_backends: [megatron-lm, deepspeed, fsdp]
+    rollout_backends: [vllm, sglang]
+    focus: "Ray multi-role RLVR and agentic pipelines."

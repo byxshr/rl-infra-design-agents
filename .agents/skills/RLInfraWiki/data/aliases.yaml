@@ -1,0 +1,8 @@
+sglang: [SGLang, sgl, radix, radixattention]
+vllm: [vLLM, pagedattention, paged-attention]
+megatron-lm: [Megatron-LM, Megatron Core, mcore, megatron]
+areal: [AReaL, ReaL]
+roll: [ROLL]
+verl: [veRL, volcano engine rl]
+weight-sync: [weight update, refit, update_weights, checkpoint sync]
+agentic: [tool calling, multi-turn, agent, openai-compatible]

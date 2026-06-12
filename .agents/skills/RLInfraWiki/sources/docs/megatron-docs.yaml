@@ -1,0 +1,18 @@
+id: doc-megatron-fsdp
+name: Megatron-FSDP documentation
+source_category: upstream-doc
+repo: NVIDIA/Megatron-LM
+local_path: ../Megatron-LM/docs/user-guide/features/megatron_fsdp.md
+captured_at: "2026-06-12"
+upstream_ref: main
+upstream_commit: de6305c0ae1e78e04929b7b6d55910ae71046ae8
+license: see-upstream
+status: active
+trust_level: primary
+refresh_policy: monthly
+relevance:
+  - "FSDP sharding strategies"
+  - "checkpoint conversion and distributed checkpointing"
+key_paths:
+  - ../Megatron-LM/docs/user-guide/features/megatron_fsdp.md
+claim_ids: []

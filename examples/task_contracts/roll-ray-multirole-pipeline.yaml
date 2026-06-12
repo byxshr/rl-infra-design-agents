@@ -1,0 +1,13 @@
+task_name: roll-ray-multirole-pipeline
+objective: "Design a Ray multi-role RLVR pipeline inspired by ROLL with explicit actor, rollout, reference, reward, and validation roles."
+target_frameworks: [roll]
+reference_frameworks: [verl]
+components: [training, rollout, reward, scheduler, observability]
+review_mode: humanize-compatible-rlcr
+builder: claude
+reviewer: codex
+deliverables: [docs/goal.md, docs/draft.md, docs/plan.md, docs/architecture.md, docs/validation_matrix.md, docs/risk_register.md]
+constraints: ["Keep Ray role boundaries explicit."]
+required_wiki_queries: ["ROLL Ray multi-role RLVR pipeline", "Ray multi-role rollout reward"]
+validation_commands: ["python .agents/skills/RLInfraWiki/scripts/query.py 'ROLL Ray multi-role RLVR pipeline' --limit 8"]
+promotion_criteria: ["Roles, dataflow, failure handling, and review gate are documented."]

@@ -1,0 +1,7 @@
+components:
+  training: "Policy optimization, gradient update, checkpointing, and optimizer state."
+  rollout: "Generation, environment interaction, logprob capture, and trajectory construction."
+  weight-sync: "Transfer updated policy weights from trainer to rollout backend."
+  data-buffer: "Prompt, sample, replay, and trajectory lifecycle between rollout and trainer."
+  reward: "Reward model, verifier, rule-based scorer, or delayed external feedback."
+  observability: "Metrics, traces, mismatch debugging, and evidence capture."

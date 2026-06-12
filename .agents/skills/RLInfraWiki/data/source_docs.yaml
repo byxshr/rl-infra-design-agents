@@ -1,0 +1,6 @@
+docs:
+  vllm_weight_transfer: doc-vllm-training-weight-transfer
+  sglang_faq_determinism: doc-sglang-faq-determinism
+  sglang_pd: doc-sglang-pd-disaggregation
+  megatron_fsdp: doc-megatron-fsdp
+  verl_sglang_worker: doc-verl-sglang-worker

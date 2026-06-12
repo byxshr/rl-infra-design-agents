@@ -1,0 +1,34 @@
+task_name: slime-weight-sync
+objective: "Design a weight synchronization path between Megatron training and SGLang rollout for an RL pipeline."
+target_frameworks: [slime]
+reference_frameworks: [verl, roll]
+components: [training, rollout, weight-sync, data-buffer]
+review_mode: humanize-compatible-rlcr
+builder: claude
+reviewer: codex
+deliverables:
+  - docs/goal.md
+  - docs/draft.md
+  - docs/plan.md
+  - docs/architecture.md
+  - docs/interfaces.md
+  - docs/validation_matrix.md
+  - docs/risk_register.md
+  - docs/codex_tasks.md
+  - review_rounds/
+constraints:
+  - "No local GPU performance claims unless reproduced."
+  - "Distinguish source-reported, inferred, experimental, and verified claims."
+  - "Include full checkpoint fallback even if delta sync is primary."
+required_wiki_queries:
+  - "Megatron SGLang weight sync"
+  - "SGLang update_weights_from_distributed"
+  - "slime data buffer rollout training"
+validation_commands:
+  - "python .agents/skills/RLInfraWiki/scripts/query.py 'Megatron SGLang weight sync' --limit 8"
+  - "python .agents/skills/RLInfraWiki/scripts/validate.py"
+  - "python .agents/skills/RLInfraWiki/scripts/validate_review_gate.py --workspace ."
+promotion_criteria:
+  - "Architecture includes primary sync path, fallback path, version tagging, failure recovery, and observability."
+  - "Plan includes APIs, tests, validation, rollback, and Claude task breakdown."
+  - "Codex review has no unresolved P0/P1 issues."

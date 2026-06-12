@@ -1,0 +1,22 @@
+id: repo-inclusionai-areal-readme
+name: AReaL README
+source_category: upstream-repo
+repo: inclusionAI/AReaL
+local_path: ../AReaL
+captured_at: "2026-06-12"
+upstream_ref: main
+upstream_commit: 67bc932cc2e214ffa6cbd26eb640e16e5dc977b5
+license: Apache-2.0
+status: active
+trust_level: primary
+refresh_policy: monthly
+relevance:
+  - "fully asynchronous RL"
+  - "agentic RL via OpenAI-compatible base_url"
+  - "SGLang/vLLM backend choices"
+  - "rollout workflow metrics"
+key_paths:
+  - README.md
+  - docs/en/reference/agent_workflow.md
+  - docs/en/algorithms/async.md
+claim_ids: []
