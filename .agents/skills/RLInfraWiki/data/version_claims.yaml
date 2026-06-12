@@ -20,7 +20,7 @@ version_claims:
     upstream_commit: 462ef83d58e6fadeb6e216dc583554a6980a0af9
     captured_at: "2026-06-12"
   vs-sglang-main-2026-06-12:
-    source_ids: [repo-sglang-readme, doc-sglang-faq-determinism, doc-sglang-pd-disaggregation]
+    source_ids: [repo-sglang-readme, doc-sglang-rl-systems, doc-sglang-faq-determinism, doc-sglang-pd-disaggregation]
     upstream_commit: 694cea8656373bbef2d1073cab92a6a6857c3d63
     captured_at: "2026-06-12"
   vs-megatron-main-2026-06-12:

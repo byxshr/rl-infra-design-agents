@@ -1,0 +1,22 @@
+id: doc-sglang-rl-systems
+name: SGLang for RL Systems docs
+source_category: upstream-doc
+repo: sgl-project/sglang
+local_path: ../sglang/docs/advanced_features/sglang_for_rl.md
+captured_at: "2026-06-12"
+upstream_ref: main
+upstream_commit: 694cea8656373bbef2d1073cab92a6a6857c3d63
+license: see-upstream
+status: active
+trust_level: primary
+refresh_policy: monthly
+relevance:
+  - "SGLang RL lifecycle"
+  - "sleep and wake memory management"
+  - "disk, tensor, and distributed weight refit APIs"
+  - "cache flush and weight version fields"
+  - "long-tail rollout and training-inference mismatch"
+key_paths:
+  - ../sglang/docs/advanced_features/sglang_for_rl.md
+  - ../sglang/docs_new/docs/advanced_features/sglang_for_rl.mdx
+claim_ids: []
