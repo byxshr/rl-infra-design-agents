@@ -50,6 +50,14 @@ Expected result: checks pass, `/tmp/rl-infra-task-workspace` is rendered, `Revie
 - `context/context_sources.yaml`
 - `docs/draft.md` and `docs/plan.md` with primary sync path, full fallback, `weight_version`, `flush_cache`, failure modes, Wiki page IDs, and source IDs.
 
+Run the slime GRPO/RLVR data-contract demo:
+
+```bash
+conda run -n rl-infra-design-agents make demo-slime-grpo-contract
+```
+
+Expected result: `/tmp/slime-grpo-rlvr-data-contract-workspace` is rendered and `Review gate passed` is printed. This task designs a slime-compatible algorithm data contract for rollout outputs, reward/verifier results, policy-version metadata, grouped GRPO samples, and trainer inputs. It is not a full GRPO/RLVR implementation and does not claim runtime, GPU, distributed, throughput, latency, or production verification.
+
 Manual sequence:
 
 ```bash

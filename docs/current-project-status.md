@@ -44,6 +44,7 @@ Important commands:
 ```bash
 conda run -n rl-infra-design-agents make check
 conda run -n rl-infra-design-agents make demo
+conda run -n rl-infra-design-agents make demo-slime-grpo-contract
 conda run -n rl-infra-design-agents make render-example
 conda run -n rl-infra-design-agents make review-gate
 ```
@@ -57,15 +58,16 @@ Last validated commands:
 | command | result |
 |---|---|
 | `git submodule update --init --recursive` | Passed in the authoring workspace. The standalone remote now exists at `https://github.com/byxshr/RLInfraWiki`; a fresh remote clone should resolve `.gitmodules` URL `../RLInfraWiki` to the sibling GitHub repository after the main repo commit is pushed. |
-| `conda run -n rl-infra-design-agents make check` | Passed: generated query indices current, RLInfraWiki validation passed, `45 passed`. |
+| `conda run -n rl-infra-design-agents make check` | Passed: generated query indices current, RLInfraWiki validation passed, `46 passed`. |
 | `conda run -n rl-infra-design-agents make demo` | Passed: check, render, review gate, P0 query; printed workspace/context paths. |
+| `conda run -n rl-infra-design-agents make demo-slime-grpo-contract` | Passed: rendered and review-gated a slime-compatible GRPO/RLVR algorithm data-contract workspace. |
 | `conda run -n rl-infra-design-agents make render-example` | Passed: rendered `/tmp/rl-infra-task-workspace` with context bundle artifacts. |
 | `conda run -n rl-infra-design-agents make review-gate` | Passed: review gate accepted the rendered example workspace. |
-| GitHub Actions `validate` workflow | Added: checkout with recursive submodules, install dev dependencies, run `make check`, `make render-example`, `make review-gate`, and P0 query smoke on push/PR. First remote Actions run should be checked after push. |
+| GitHub Actions `validate` workflow | Updated: checkout with recursive submodules, install dev dependencies, run `make check`, `make render-example`, `make review-gate`, P0 query smoke, and slime GRPO/RLVR data-contract demo on push/PR. First remote Actions run should be checked after push. |
 | `python scripts/validate.py` in standalone `RLInfraWiki/` | Passed. |
 | `python scripts/generate_indices.py --check` in standalone `RLInfraWiki/` | Passed. |
 | `python scripts/compose_context.py ... && python scripts/validate_context_bundle.py ...` in standalone `RLInfraWiki/` | Passed. |
-| `conda run -n rl-infra-design-agents pytest -q` in standalone `RLInfraWiki/` | Passed: `45 passed`. Bare base `pytest` exited 139 in this environment, so conda env is the validated test runner. |
+| `conda run -n rl-infra-design-agents pytest -q` in standalone `RLInfraWiki/` | Passed: `46 passed`. Bare base `pytest` exited 139 in this environment, so conda env is the validated test runner. |
 
 ## Completed Progress
 
@@ -104,6 +106,17 @@ The evidence style intentionally follows KernelWiki's layered discipline:
 
 Large upstream docs or source files are not copied into the Wiki. Pages use evidence summaries and SourcePack source refs with source IDs, upstream commits, repo-relative paths, line ranges, claim IDs, and provenance. Local clones are ingestion backends only.
 
+### Slime GRPO/RLVR Data Contract
+
+The second golden path is `examples/task_contracts/slime-grpo-rlvr-data-contract.yaml`. It renders a slime-compatible algorithm data-contract design workspace rather than a full GRPO/RLVR implementation.
+
+The rendered workspace covers:
+
+- rollout sample fields, `old_logprob`, optional `reference_logprob`, reward/verifier output, `group_id`, and `policy_version`.
+- boundaries between rollout backend, reward service, data buffer, and trainer batch materialization.
+- validation/risk pages for sample schema drift, logprob consistency, grouped rollout invariants, reward timeout, stale-policy bound, and train/infer schema match.
+- explicit non-claims for GPU, distributed training, throughput, latency, production readiness, and source-reported behavior.
+
 ### Standalone RLInfraWiki
 
 Top-level `RLInfraWiki/` is now the canonical skill root and RL infra dictionary repository. It includes:
@@ -113,7 +126,7 @@ Top-level `RLInfraWiki/` is now the canonical skill root and RL infra dictionary
 - Unknown-framework tooling: `map_framework.py`, `plan_adapter.py`, `diff_capabilities.py`, `compare_frameworks.py`, `search_symbols.py`, `explain.py`, `resolve_alias.py`.
 - First dictionary layer: concept, capability, interface, algorithm, framework-profile, failure-mode, validation-pattern, and adapter-recipe pages.
 
-The main repo pins standalone commit `7768121` at `.agents/skills/RLInfraWiki`. `.gitmodules` uses the relative URL `../RLInfraWiki`, which resolves to the sibling GitHub repository `https://github.com/byxshr/RLInfraWiki` for normal clones of `https://github.com/byxshr/rl-infra-design-agents`.
+The main repo pins standalone commit `3245efa` at `.agents/skills/RLInfraWiki`. `.gitmodules` uses the relative URL `../RLInfraWiki`, which resolves to the sibling GitHub repository `https://github.com/byxshr/RLInfraWiki` for normal clones of `https://github.com/byxshr/rl-infra-design-agents`.
 
 ### Source Manifests
 
@@ -144,7 +157,7 @@ Use `docs/project-improvement-status.md` as the source of truth for detailed ite
 
 1. Keep standalone `RLInfraWiki/` validation and main repo `make demo` green when changing the submodule.
 2. Watch GitHub Actions after each push; fix submodule, dependency, or review-gate drift before expanding content.
-3. Add more task contracts from `IMP-004` using the context bundle workflow.
+3. Promote rollout backend selection and training/rollout mismatch debugging contracts to golden paths.
 4. Promote P1 Wiki tracks from `docs/rlinfrawiki-content-status.md`, starting with rollout backend selection and async agentic RL.
 
 ## Developer Notes

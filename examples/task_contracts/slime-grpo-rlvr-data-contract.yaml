@@ -1,0 +1,39 @@
+task_name: slime-grpo-rlvr-data-contract
+objective: "Design a slime-compatible GRPO/RLVR algorithm data contract that maps rollout outputs, reward/verifier results, policy-version metadata, and trainer inputs into a reviewable interface and implementation plan."
+target_frameworks: [slime]
+reference_frameworks: [verl, roll, areal]
+components: [algorithm, training, rollout, reward, data-buffer, observability]
+review_mode: humanize-compatible-rlcr
+builder: claude
+reviewer: codex
+deliverables:
+  - docs/goal.md
+  - docs/draft.md
+  - docs/plan.md
+  - docs/architecture.md
+  - docs/interfaces.md
+  - docs/validation_matrix.md
+  - docs/risk_register.md
+  - docs/codex_tasks.md
+  - review_rounds/
+constraints:
+  - "Do not implement a full GRPO/RLVR trainer in this task."
+  - "Treat upstream behavior as source-reported unless local commands, logs, and artifacts prove it."
+  - "Do not claim GPU, distributed training, throughput, latency, or production readiness."
+  - "Keep the design target-aware for slime but include cross-framework context from verl, ROLL, and AReaL."
+required_wiki_queries:
+  - "slime GRPO RLVR algorithm data contract old logprob reward group policy version"
+  - "AlgorithmDataContract rollout logprob sample grouping reward verifier"
+  - "sample schema drift logprob consistency stale policy"
+validation_commands:
+  - "python .agents/skills/RLInfraWiki/scripts/query.py 'slime GRPO RLVR algorithm data contract old logprob reward group policy version' --limit 8"
+  - "python .agents/skills/RLInfraWiki/scripts/compose_context.py --target-framework slime --task 'Design a slime-compatible GRPO/RLVR algorithm data contract with old logprob reward grouping and policy versioning' --mode design --output /tmp/slime-grpo-context.md"
+  - "python .agents/skills/RLInfraWiki/scripts/validate_context_bundle.py /tmp/slime-grpo-context.md"
+  - "python .agents/skills/RLInfraWiki/scripts/validate.py"
+  - "python .agents/skills/RLInfraWiki/scripts/validate_review_gate.py --workspace ."
+promotion_criteria:
+  - "Architecture maps slime rollout output, reward/verifier result, data-buffer record, and trainer batch boundaries."
+  - "Interfaces define required sample, trajectory, group, reward, old logprob, reference logprob, and policy-version fields."
+  - "Validation matrix covers schema drift, grouped rollout invariants, logprob consistency, reward timeout, stale-policy bound, and train/infer schema match."
+  - "Plan cites RLInfraWiki page IDs and source IDs and does not mark source-reported behavior as verified."
+  - "Codex review has no unresolved P0/P1 issues."

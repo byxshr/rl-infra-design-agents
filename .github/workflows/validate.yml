@@ -38,3 +38,6 @@ jobs:
 
       - name: Query P0 RLInfraWiki path
         run: python .agents/skills/RLInfraWiki/scripts/query.py "Megatron SGLang weight sync" --limit 8
+
+      - name: Render and review slime GRPO/RLVR data-contract path
+        run: make demo-slime-grpo-contract
