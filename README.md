@@ -1,5 +1,7 @@
 # RL-infra-design-agents
 
+[![validate](https://github.com/byxshr/rl-infra-design-agents/actions/workflows/validate.yml/badge.svg)](https://github.com/byxshr/rl-infra-design-agents/actions/workflows/validate.yml)
+
 `RL-infra-design-agents` is a lightweight workflow and knowledge-base repository for RL, RLHF, RLVR, and agentic-RL infrastructure design tasks. It is not an RL framework and does not wrap slime, verl, AReaL, ROLL, vLLM, SGLang, or Megatron-LM.
 
 The default workflow is Humanize-compatible RLCR:

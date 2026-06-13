@@ -29,7 +29,8 @@ Update this file whenever an improvement item is completed, re-scoped, blocked, 
 | P0 RLInfraWiki content | done | Standalone `RLInfraWiki/` is pinned by `.agents/skills/RLInfraWiki` and preserves `slime + Megatron + SGLang weight sync` query/render/review behavior. | Keep standalone validation green before updating the submodule pointer. |
 | Example rendering | done | `make render-example` produced `/tmp/rl-infra-task-workspace` with `context/context_bundle.md`, `context/context_bundle.json`, and `context/context_sources.yaml`. | Use generated context artifacts in review. |
 | Review gate | done | `make review-gate` passed and now rejects missing/invalid context bundles. | Keep no-target-only and page/source ID checks green. |
-| Git state | done | Main repo uses `.agents/skills/RLInfraWiki` as a gitlink pinned to standalone `RLInfraWiki`; tracked `.gitmodules` uses relative URL `../RLInfraWiki`, which resolves to published sibling repo `https://github.com/byxshr/RLInfraWiki`. | Push the main repo commit after standalone remote publication. |
+| Git state | done | Main repo uses `.agents/skills/RLInfraWiki` as a gitlink pinned to standalone `RLInfraWiki`; tracked `.gitmodules` uses relative URL `../RLInfraWiki`, which resolves to published sibling repo `https://github.com/byxshr/RLInfraWiki`. | Keep submodule initialization green in fresh clones and CI. |
+| CI | done | `.github/workflows/validate.yml` checks out submodules, installs dev dependencies, runs `make check`, renders the P0 workspace, validates the review gate, and performs a P0 query smoke. | Watch the first remote Actions run after push and keep it green. |
 
 ## Improvement Roadmap
 
@@ -45,13 +46,14 @@ Update this file whenever an improvement item is completed, re-scoped, blocked, 
 | IMP-008 | Demo workspace fixture | P1 | todo | Make generated demo output reviewable in git without relying on `/tmp`. | Add a small expected-workspace fixture or golden snapshot strategy that records key generated sections without committing volatile run artifacts. | Tests can detect when renderer output loses required P0 evidence. | 2026-06-13 |
 | IMP-009 | Review gate strengthening | P2 | done | Make review gate check design quality, not only file presence/status. | Review gate now requires context bundle markdown/json/source files, validates four-pack coverage, page IDs, source IDs, generic/cross-framework/validation packs, and keeps performance/production claims tied to context. Round-2 review found no blocker; the noted P3 branch coverage gap was closed with direct regression tests for invalid, missing validation/risk, missing source IDs, and missing sources-map contexts. | `make review-gate` passed for the upgraded rendered workspace; missing context artifacts fail locally; standalone `tests/test_review_gate.py` now has 15 passing gate tests. | 2026-06-13 |
 | IMP-010 | Source refresh workflow | P2 | deferred | Keep local source manifests aligned with upstream clones. | After content stabilizes, improve refresh scripts or docs so agents can refresh source manifests and version claims safely. | Source refresh can update commit/version metadata without breaking `make check`. | 2026-06-13 |
+| IMP-011 | GitHub Actions CI | P1 | done | Make published repositories self-checking after push and PRs. | Enhanced `validate.yml` to checkout the RLInfraWiki submodule, install dev dependencies, run `make check`, render the P0 task workspace, validate review gate, and run a P0 query smoke. | Local equivalents passed before CI change; first remote Actions run should pass after push. | 2026-06-13 |
 
 ## Immediate Recommended Sequence
 
 1. Keep `make demo`, `make check`, `make render-example`, and `make review-gate` green after any RLInfraWiki submodule update.
 2. Add task contracts from `IMP-004` using the context bundle workflow.
 3. Promote P1 Wiki tracks from `IMP-005` in the standalone `RLInfraWiki/` repository, then update the main repo gitlink.
-4. Push the main repo migration commit after confirming the standalone remote contains commit `7768121`.
+4. Watch GitHub Actions after each push; fix submodule, dependency, or review-gate drift before expanding content.
 
 ## Maintenance Rules
 

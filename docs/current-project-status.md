@@ -16,13 +16,13 @@ For detailed ledgers, use:
 
 Current branch: `main`
 
-Recent commits:
+Key migration commits:
 
 | commit | summary |
 |---|---|
+| `ac8f346` | Document published RLInfraWiki remote |
 | `38d1602` | Make RLInfraWiki a standalone dependency |
 | `b3c6458` | Add project improvement status ledger |
-| `83bd029` | Implement P0 RLInfraWiki evidence content |
 
 At this migration handoff, standalone RLInfraWiki is published at `https://github.com/byxshr/RLInfraWiki`, and the main repo migration is committed in `38d1602`.
 
@@ -61,6 +61,7 @@ Last validated commands:
 | `conda run -n rl-infra-design-agents make demo` | Passed: check, render, review gate, P0 query; printed workspace/context paths. |
 | `conda run -n rl-infra-design-agents make render-example` | Passed: rendered `/tmp/rl-infra-task-workspace` with context bundle artifacts. |
 | `conda run -n rl-infra-design-agents make review-gate` | Passed: review gate accepted the rendered example workspace. |
+| GitHub Actions `validate` workflow | Added: checkout with recursive submodules, install dev dependencies, run `make check`, `make render-example`, `make review-gate`, and P0 query smoke on push/PR. First remote Actions run should be checked after push. |
 | `python scripts/validate.py` in standalone `RLInfraWiki/` | Passed. |
 | `python scripts/generate_indices.py --check` in standalone `RLInfraWiki/` | Passed. |
 | `python scripts/compose_context.py ... && python scripts/validate_context_bundle.py ...` in standalone `RLInfraWiki/` | Passed. |
@@ -142,7 +143,7 @@ Two maintenance ledgers now exist:
 Use `docs/project-improvement-status.md` as the source of truth for detailed item status. The immediate sequence is:
 
 1. Keep standalone `RLInfraWiki/` validation and main repo `make demo` green when changing the submodule.
-2. Push the main repo migration commit so fresh clones can initialize the published standalone submodule.
+2. Watch GitHub Actions after each push; fix submodule, dependency, or review-gate drift before expanding content.
 3. Add more task contracts from `IMP-004` using the context bundle workflow.
 4. Promote P1 Wiki tracks from `docs/rlinfrawiki-content-status.md`, starting with rollout backend selection and async agentic RL.
 

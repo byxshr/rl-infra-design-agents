@@ -8,13 +8,33 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    env:
+      WORKSPACE: /tmp/rl-infra-task-workspace-ci
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout repository and RLInfraWiki submodule
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Show pinned RLInfraWiki revision
+        run: git submodule status .agents/skills/RLInfraWiki
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: python -m pip install -e ".[dev]"
-      - run: python .agents/skills/RLInfraWiki/scripts/validate.py
-      - run: python .agents/skills/RLInfraWiki/scripts/generate_indices.py --check
-      - run: python .agents/skills/RLInfraWiki/scripts/repo_status.py
-      - run: pytest -q
+
+      - name: Install package
+        run: python -m pip install -e ".[dev]"
+
+      - name: Validate indices, schema, and tests
+        run: make check
+
+      - name: Render P0 task workspace
+        run: make render-example
+
+      - name: Validate review gate
+        run: make review-gate
+
+      - name: Query P0 RLInfraWiki path
+        run: python .agents/skills/RLInfraWiki/scripts/query.py "Megatron SGLang weight sync" --limit 8
