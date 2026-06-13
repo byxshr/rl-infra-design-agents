@@ -6,9 +6,20 @@ This repository is a task-agnostic workflow and knowledge-base repository for RL
 
 The default implementation workflow is Humanize-compatible RLCR: Claude implements, Codex independently reviews, and the human remains the architect.
 
-## Canonical Codex skill
+## RLInfraWiki dependency
 
-Use `.agents/skills/RLInfraWiki/` as the canonical Codex skill location.
+Use `.agents/skills/RLInfraWiki/` as the RLInfraWiki skill location. It is a standalone repository pinned by the main repo as a local submodule-style dependency. Because the remote was unavailable during migration, `.gitmodules` uses `../RLInfraWiki` as the fallback relative URL; this authoring workspace may use a local `.git/config` override to the sibling checkout. When the remote is available, switch the URL to `https://github.com/byxshr/RLInfraWiki` and run `git submodule sync && git submodule update --init --recursive`.
+
+Before RL infrastructure design work:
+
+1. Ensure the dependency exists with `git submodule update --init --recursive`.
+2. Generate a context bundle:
+   `python .agents/skills/RLInfraWiki/scripts/compose_context.py --target-framework <framework> --task "<task>" --mode design --output <workspace>/context/context_bundle.md`
+3. Validate the bundle:
+   `python .agents/skills/RLInfraWiki/scripts/validate_context_bundle.py <workspace>/context/context_bundle.md`
+4. Cite RLInfraWiki page IDs and source IDs in drafts, plans, reviews, and validation evidence.
+
+Known-target designs must be target-aware but not target-only: include Target Framework, Generic Infra, Cross-Framework, and Validation & Risk packs.
 
 ## Repository rules
 
@@ -18,6 +29,7 @@ Use `.agents/skills/RLInfraWiki/` as the canonical Codex skill location.
 - Do not make performance claims without source, hardware/context, confidence, and reproducibility fields.
 - Do not mark upstream README claims as `verified`; use `source-reported` unless locally reproduced.
 - Do not manually edit generated query indices. Run `generate_indices.py` instead.
+- Do not edit RLInfraWiki content inside the main repo unless the task explicitly asks for a dependency update.
 
 ## Review guidelines
 
@@ -28,6 +40,7 @@ When acting as Codex Reviewer, review the diff against:
 3. `docs/validation_matrix.md`.
 4. `review_issues.jsonl` and unresolved prior issues.
 5. RLInfraWiki source and claim provenance.
+6. `context/context_bundle.md`, `context/context_bundle.json`, and `context/context_sources.yaml`.
 
 Flag as P0/P1:
 
@@ -35,6 +48,8 @@ Flag as P0/P1:
 - Missing validation for a promoted candidate.
 - Claim marked `verified` without local reproduction evidence.
 - Broken source IDs, missing provenance, or generated index drift.
+- Missing context bundle, target-only context, missing generic/cross-framework/validation packs, or missing page/source IDs.
+- Performance or production claims without complete context, source IDs, validation/risk coverage, and local evidence when claiming verification.
 - Private data, model weights, benchmark logs, or task-specific artifacts added to the workflow repo.
 - Implementation that bypasses rollback, observability, or failure handling required by the goal.
 

@@ -11,7 +11,9 @@ Use it to answer:
 - Which content themes should be implemented first.
 - What the next agent should inspect before editing a page.
 
-The canonical content remains under `.agents/skills/RLInfraWiki/wiki/`. This ledger should be updated whenever a wiki page is materially expanded, re-scoped, or promoted to a higher maturity stage.
+The canonical content is now the standalone top-level `RLInfraWiki/` repository. The main repo consumes it at `.agents/skills/RLInfraWiki/` as a pinned gitlink/submodule-style dependency. Older references to `.agents/skills/RLInfraWiki/` describe the mounted dependency path, not the canonical authoring location.
+
+`docs/RLInfraWiki独立仓库改进方案_v1_1.md` is the final execution plan for this migration. `docs/RLInfraWiki独立仓库改进方案_v1.md` is retained only as background and non-conflicting supplemental detail.
 
 ## Status Taxonomy
 
@@ -19,7 +21,7 @@ The canonical content remains under `.agents/skills/RLInfraWiki/wiki/`. This led
 |---|---|---|
 | `stub` | Category README or very thin placeholder that cannot support a design decision. | Add frontmatter-backed page content or decide that the file should stay a navigational placeholder. |
 | `indexed` | Has frontmatter, summary, sources, risks, and can be found by `query.py`, but lacks code-level evidence. | Add local code paths, function/config names, source-doc paths, design implications, failure modes, and validation ideas. |
-| `code-evidenced` | Cites local clone paths, functions/configs, or official doc paths that substantiate the design notes. | Add review-ready structure: design implications, failure modes, validation plan, open gaps, and source boundary notes. |
+| `code-evidenced` | Cites SourcePack source IDs/source refs, upstream commits, repo-relative paths, line ranges, claim IDs, functions/configs, or official doc paths that substantiate the design notes. | Add review-ready structure: design implications, failure modes, validation plan, open gaps, and source boundary notes. |
 | `review-ready` | Can directly support architecture/design review with code evidence, design tradeoffs, failure modes, validation ideas, and open gaps. | Keep refreshed with upstream version claims and prevent unverified performance claims. |
 
 ## Theme Roadmap
@@ -27,6 +29,7 @@ The canonical content remains under `.agents/skills/RLInfraWiki/wiki/`. This led
 | theme | priority | current_status | target_status | pages | next_action |
 |---|---|---|---|---:|---|
 | slime + Megatron + SGLang weight sync | P0 | review-ready | review-ready | 11 | Use the P0 pages for task-bundle review; refresh source paths after upstream changes or local GPU validation. |
+| RL infra dictionary and context bundle | P0 | review-ready | review-ready | 76 | Maintain concept/capability/interface/algorithm/framework-profile/failure/validation/adapter pages and context-bundle quality gates in standalone `RLInfraWiki/`. |
 | rollout backend selection | P1 | indexed | code-evidenced | 7 | Add vLLM/SGLang API and failure-mode evidence for rollout backend selection. |
 | async agentic RL | P1 | indexed | code-evidenced | 6 | Add AReaL/ROLL/verl/slime agentic rollout and async lifecycle evidence. |
 | Ray orchestration and multi-role pipelines | P1 | indexed | code-evidenced | 3 | Add ROLL/Ray role, placement, and lifecycle evidence. |
@@ -55,7 +58,7 @@ The canonical content remains under `.agents/skills/RLInfraWiki/wiki/`. This led
 | migration-kda-to-rl-infra | wiki/migrations/kda-to-rl-infra.md | migration | migration and general playbooks | indexed | code-evidenced | P2 | Missing concrete before/after examples from rendered task workspaces. | Add references to example task contracts and rendered workspace artifacts. | 2026-06-12 |
 | observability-debug-playbook | wiki/observability/debug-playbook.md | observability | observability and mismatch debugging | indexed | code-evidenced | P2 | Missing concrete metrics, logs, and failure injection evidence. | Add validation matrix examples and framework-specific metrics paths. | 2026-06-12 |
 | observability-training-inference-mismatch | wiki/observability/training-inference-mismatch.md | observability | observability and mismatch debugging | indexed | code-evidenced | P1 | Missing logprob mismatch, deterministic inference, and cache-hit test evidence. | Cite SGLang deterministic inference docs and test utilities for logprob/cache checks. | 2026-06-12 |
-| pattern-async-rollout | wiki/patterns/async-rollout.md | pattern | async agentic RL | indexed | code-evidenced | P1 | Missing async train loop, update interval, and stale-policy evidence. | Cite `../slime/train_async.py` and AReaL/ROLL async lifecycle paths. | 2026-06-12 |
+| pattern-async-rollout | wiki/patterns/async-rollout.md | pattern | async agentic RL | indexed | code-evidenced | P1 | Missing async train loop, update interval, and stale-policy evidence. | Add SourcePack refs for slime `train_async.py` plus AReaL/ROLL async lifecycle paths. | 2026-06-12 |
 | pattern-colocated-train-rollout | wiki/patterns/colocated-train-rollout.md | pattern | rollout backend selection | indexed | code-evidenced | P1 | Missing memory/offload, sleep/wake, and colocated sync evidence. | Add SGLang sleep/wake and slime colocated lifecycle references. | 2026-06-12 |
 | pattern-disaggregated-train-rollout | wiki/patterns/disaggregated-train-rollout.md | pattern | rollout backend selection | indexed | code-evidenced | P1 | Missing distributed group, disk fallback, and version boundary evidence. | Cite slime distributed/disk update paths and SGLang refit docs. | 2026-06-12 |
 | pattern-megatron-sglang | wiki/patterns/megatron-sglang.md | pattern | slime + Megatron + SGLang weight sync | review-ready | review-ready | P0 | Cross-page evidence added for Megatron conversion, slime update paths, SGLang refit, cache, version, and fallback; still lacks end-to-end GPU run. | Use as the architecture pattern for P0 review packets. | 2026-06-13 |

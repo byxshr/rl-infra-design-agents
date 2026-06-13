@@ -10,16 +10,17 @@ Codex is the independent Reviewer. The human remains the architect.
 
 1. Read `task_contract.yaml`.
 2. Read `docs/goal.md`.
-3. Query RLInfraWiki before framework-specific design decisions.
-4. Write or update `docs/draft.md`.
-5. Produce or refine `docs/plan.md`.
-6. Lock plan before implementation.
-7. Implement one candidate batch at a time.
-8. Run validation.
-9. Record evidence.
-10. Prepare a review packet.
-11. Wait for Codex review.
-12. Fix P0/P1 issues before promotion.
+3. Generate `context/context_bundle.md` with RLInfraWiki before framework-specific design decisions.
+4. Validate the context bundle and read pages from all four packs.
+5. Write or update `docs/draft.md`.
+6. Produce or refine `docs/plan.md`.
+7. Lock plan before implementation.
+8. Implement one candidate batch at a time.
+9. Run validation.
+10. Record evidence.
+11. Prepare a review packet.
+12. Wait for Codex review.
+13. Fix P0/P1 issues before promotion.
 
 ## Do not
 
@@ -29,6 +30,7 @@ Codex is the independent Reviewer. The human remains the architect.
 - Do not downgrade source-reported claims to verified.
 - Do not hide failed validation.
 - Do not commit private data, weights, benchmark logs, or generated task artifacts to this workflow repo.
+- Do not produce target-framework-only designs when RLInfraWiki knows the target framework.
 
 ## Handling Codex review
 

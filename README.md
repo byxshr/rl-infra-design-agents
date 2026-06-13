@@ -11,7 +11,7 @@ The default workflow is Humanize-compatible RLCR:
 
 ## Repository Layout
 
-- `.agents/skills/RLInfraWiki/`: canonical Codex skill, wiki, scripts, data, and tests.
+- `.agents/skills/RLInfraWiki/`: standalone RLInfraWiki dependency pinned by this repo; the root is the skill root.
 - `docs/`: workflow documentation for goal contracts, RLCR, review gates, evidence, and sandboxing.
 - `integrations/humanize/`: adapter prompts and config templates for a Claude Builder + Codex Reviewer loop.
 - `examples/task_contracts/`: starter contracts that render complete task workspaces.
@@ -19,9 +19,46 @@ The default workflow is Humanize-compatible RLCR:
 
 ## Quick Start
 
+Initialize the RLInfraWiki dependency first:
+
+```bash
+git submodule update --init --recursive
+```
+
+During this migration the future remote `https://github.com/byxshr/RLInfraWiki` was not available, so `.gitmodules` uses `../RLInfraWiki` as the fallback relative URL. In this authoring workspace `.git/config` may override that URL to the local absolute sibling checkout so validation can run before the remote exists. Until the remote is published, `git submodule update --init --recursive` is verified only in a workspace that has the sibling standalone `RLInfraWiki/` checkout or an equivalent local URL override.
+
+To switch later:
+
+```bash
+git config -f .gitmodules 'submodule..agents/skills/RLInfraWiki.url' https://github.com/byxshr/RLInfraWiki
+git submodule sync .agents/skills/RLInfraWiki
+git submodule update --init --recursive
+```
+
+Run the P0 demo:
+
+```bash
+conda run -n rl-infra-design-agents make demo
+```
+
+Expected result: checks pass, `/tmp/rl-infra-task-workspace` is rendered, `Review gate passed` is printed, and the workspace contains:
+
+- `context/context_bundle.md`
+- `context/context_bundle.json`
+- `context/context_sources.yaml`
+- `docs/draft.md` and `docs/plan.md` with primary sync path, full fallback, `weight_version`, `flush_cache`, failure modes, Wiki page IDs, and source IDs.
+
+Manual sequence:
+
 ```bash
 python -m pip install -e ".[dev]"
 python .agents/skills/RLInfraWiki/scripts/query.py "Megatron SGLang rollout" --limit 5
+python .agents/skills/RLInfraWiki/scripts/compose_context.py \
+  --target-framework slime \
+  --task "Design a weight synchronization path between Megatron training and SGLang rollout for an RL pipeline." \
+  --mode design \
+  --output /tmp/rl-infra-context.md
+python .agents/skills/RLInfraWiki/scripts/validate_context_bundle.py /tmp/rl-infra-context.md
 python .agents/skills/RLInfraWiki/scripts/render_task_bundle.py \
   --contract examples/task_contracts/slime-weight-sync.yaml \
   --output /tmp/rl-infra-task-workspace
@@ -35,6 +72,8 @@ python .agents/skills/RLInfraWiki/scripts/validate_review_gate.py --workspace /t
 ## Validation
 
 ```bash
+python .agents/skills/RLInfraWiki/scripts/compose_context.py --target-framework verl --task "add SGLang rollout backend with weight sync" --mode design --output /tmp/context_bundle.md
+python .agents/skills/RLInfraWiki/scripts/validate_context_bundle.py /tmp/context_bundle.md
 python .agents/skills/RLInfraWiki/scripts/validate.py
 python .agents/skills/RLInfraWiki/scripts/generate_indices.py --check
 python .agents/skills/RLInfraWiki/scripts/repo_status.py
