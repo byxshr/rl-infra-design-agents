@@ -12,7 +12,7 @@ Last updated: 2026-06-13
 
 - 新建独立 `RLInfraWiki/` skill root，包含 `SKILL.md`、`README.md`、`AGENTS.md`、`CLAUDE.md`、`Makefile`、`pyproject.toml`、`scripts/`、`data/`、`sources/`、`wiki/`、`queries/`、`candidates/`、`artifacts/`、`references/`、`tests/`。
 - 主仓 `.agents/skills/RLInfraWiki` 从 tracked embedded files 切换为 gitlink，当前 pinned standalone commit: `7768121`.
-- `.gitmodules` 当前使用 fallback 相对 URL `../RLInfraWiki`。远端 `https://github.com/byxshr/RLInfraWiki` 可用后按 README/AGENTS 步骤切换。本 authoring workspace 使用本地 `.git/config` override 指向 sibling checkout，因此 submodule 初始化验证尚不代表远端可复现。
+- `.gitmodules` 当前使用相对 URL `../RLInfraWiki`，可从主仓 GitHub remote 解析到 sibling 仓库 `https://github.com/byxshr/RLInfraWiki`；该独立远端已发布并包含 pinned commit `7768121`。
 - 新增/增强 SourcePack 机制：wiki 正文不再长期引用 `../slime`、`../sglang`、`../verl`、`../ROLL`、`../AReaL` 等本地相对路径；证据改用 source id、repo、commit、repo-relative path、line range、claim id、provenance。
 - 将 Wiki 从 framework summary 扩展为 RL infra dictionary，新增首批 concept/capability/interface/algorithm/framework-profile/failure-mode/validation-pattern/adapter-recipe 页面。
 - 实现 Context Bundle / Cross-Framework Retrieval 和未知框架适配工具。
@@ -36,7 +36,7 @@ Last updated: 2026-06-13
   - 新增 `demo` target。
   - `render-example` 使用 `--overwrite-human-docs`，保证 P0 demo 输出展示最新上下文和模板质量。
 - `README.md`
-  - 新增 submodule init、本地 fallback、未来远端切换步骤。
+  - 新增 submodule init、published sibling remote 说明和可选绝对 URL 配置步骤。
   - 新增 P0 demo quickstart 和 context bundle 手工命令。
 - `AGENTS.md` / `CLAUDE.md`
   - 明确 RLInfraWiki 是独立依赖。
@@ -110,7 +110,7 @@ python scripts/verify_artifacts.py
 conda run -n rl-infra-design-agents pytest -q
 ```
 
-迁移后主仓验证（来自当前 staged working tree，尚未对应一个已提交的主仓 commit）：
+迁移后主仓验证（最初在 staged working tree 中完成；随后主仓迁移提交为 `38d1602`）：
 
 ```bash
 git submodule update --init --recursive
@@ -120,7 +120,7 @@ conda run -n rl-infra-design-agents make render-example
 conda run -n rl-infra-design-agents make review-gate
 ```
 
-Observed result from staged working tree:
+Observed result:
 
 - 主仓 `make check`: generated indices current, RLInfraWiki validation passed, `45 passed`.
 - 主仓 `make demo`: check/render/review/query 全通过，并打印 `/tmp/rl-infra-task-workspace` 和 context bundle 路径。
@@ -154,7 +154,7 @@ conda run -n rl-infra-design-agents pytest -q
 重点建议 reviewer 看：
 
 - `.agents/skills/RLInfraWiki` 是否正确作为 gitlink/submodule-style dependency，而不是重新 vendor 旧 tracked tree。
-- `.gitmodules` 本地路径 fallback 是否符合 README/AGENTS 文档；未来 remote URL 切换步骤是否清楚。
+- `.gitmodules` 相对 URL `../RLInfraWiki` 是否符合 README/AGENTS 文档，并可解析到 published sibling remote。
 - Standalone `RLInfraWiki/` 是否保持 skill root：根目录直接包含 `SKILL.md`、`scripts/`、`data/`、`sources/`、`wiki/`、`queries/`。
 - `scripts/_wiki_root.py` 是否对错误 `RLINFRA_WIKI_ROOT` 非零退出。
 - Wiki 正文是否仍残留 `../slime`、`../sglang`、`../verl`、`../ROLL`、`../AReaL` 作为证据路径。
@@ -167,7 +167,7 @@ conda run -n rl-infra-design-agents pytest -q
 
 ## Git State Notes
 
-主仓 `git status` 会显示旧内嵌 `.agents/skills/RLInfraWiki/**` 文件删除，同时新增 `.agents/skills/RLInfraWiki` gitlink 和 `.gitmodules`。这是 expected migration shape：tracked embedded tree 被固定版本依赖取代。
+主仓迁移提交 `38d1602` 将旧内嵌 `.agents/skills/RLInfraWiki/**` tracked tree 替换为 `.agents/skills/RLInfraWiki` gitlink 和 `.gitmodules`。这是 expected migration shape：tracked embedded tree 被固定版本依赖取代。
 
 Standalone `RLInfraWiki/` 当前 commit:
 
@@ -181,7 +181,7 @@ c2f7c14 Relax context-backed performance claim gate
 Reviewer follow-up note:
 
 - Round-1 review correctly flagged that `c2f7c14` weakened the performance/production claim gate too far. Follow-up changes restore a parsed/validated context-bundle requirement for risky claims and add a regression test.
-- Round-1 review also correctly flagged the absolute `.gitmodules` path. The tracked `.gitmodules` path is now `../RLInfraWiki`; remote reproducibility still requires publishing `https://github.com/byxshr/RLInfraWiki`.
-- Round-1 review correctly noted that main-repo validation was collected from staged-but-uncommitted state. This document now labels those validation results accordingly.
+- Round-1 review also correctly flagged the absolute `.gitmodules` path. The tracked `.gitmodules` path is now `../RLInfraWiki`, and the sibling remote `https://github.com/byxshr/RLInfraWiki` has been published.
+- Round-1 review correctly noted that main-repo validation was collected from staged-but-uncommitted state. The migration has since been committed as `38d1602`.
 - Round-2 review found no new blocker. Its P3 coverage question was adopted proactively: standalone commit `7768121` adds direct tests for invalid context bundles, missing validation/risk pack, missing validation/risk source IDs, and missing context_sources validation/risk source map.
-- Round-3 review found no new material concern and confirmed the round-2 P3 coverage gap is closed. This review series is complete; the remaining items are publishing the standalone remote and committing the staged main-repo migration.
+- Round-3 review found no new material concern and confirmed the round-2 P3 coverage gap is closed. The follow-up publication step is now complete: standalone remote is published and main migration is committed.

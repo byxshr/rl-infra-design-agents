@@ -20,11 +20,11 @@ Recent commits:
 
 | commit | summary |
 |---|---|
+| `38d1602` | Make RLInfraWiki a standalone dependency |
 | `b3c6458` | Add project improvement status ledger |
 | `83bd029` | Implement P0 RLInfraWiki evidence content |
-| `e96e175` | Implement RL infra design agents workflow |
 
-At this migration handoff, standalone RLInfraWiki changes are committed, while the main repo migration changes are staged but not yet represented by a main repo commit.
+At this migration handoff, standalone RLInfraWiki is published at `https://github.com/byxshr/RLInfraWiki`, and the main repo migration is committed in `38d1602`.
 
 ## What The Project Is
 
@@ -56,7 +56,7 @@ Last validated commands:
 
 | command | result |
 |---|---|
-| `git submodule update --init --recursive` | Passed in the authoring workspace with local standalone RLInfraWiki dependency. This is not yet a remote-reproducible validation because `https://github.com/byxshr/RLInfraWiki` was unavailable. |
+| `git submodule update --init --recursive` | Passed in the authoring workspace. The standalone remote now exists at `https://github.com/byxshr/RLInfraWiki`; a fresh remote clone should resolve `.gitmodules` URL `../RLInfraWiki` to the sibling GitHub repository after the main repo commit is pushed. |
 | `conda run -n rl-infra-design-agents make check` | Passed: generated query indices current, RLInfraWiki validation passed, `45 passed`. |
 | `conda run -n rl-infra-design-agents make demo` | Passed: check, render, review gate, P0 query; printed workspace/context paths. |
 | `conda run -n rl-infra-design-agents make render-example` | Passed: rendered `/tmp/rl-infra-task-workspace` with context bundle artifacts. |
@@ -112,7 +112,7 @@ Top-level `RLInfraWiki/` is now the canonical skill root and RL infra dictionary
 - Unknown-framework tooling: `map_framework.py`, `plan_adapter.py`, `diff_capabilities.py`, `compare_frameworks.py`, `search_symbols.py`, `explain.py`, `resolve_alias.py`.
 - First dictionary layer: concept, capability, interface, algorithm, framework-profile, failure-mode, validation-pattern, and adapter-recipe pages.
 
-The main repo pins standalone commit `7768121` at `.agents/skills/RLInfraWiki`. `.gitmodules` currently uses fallback relative URL `../RLInfraWiki`; the authoring workspace uses a local `.git/config` override to the sibling standalone checkout for validation before the remote exists. Switch to `https://github.com/byxshr/RLInfraWiki` when the remote exists.
+The main repo pins standalone commit `7768121` at `.agents/skills/RLInfraWiki`. `.gitmodules` uses the relative URL `../RLInfraWiki`, which resolves to the sibling GitHub repository `https://github.com/byxshr/RLInfraWiki` for normal clones of `https://github.com/byxshr/rl-infra-design-agents`.
 
 ### Source Manifests
 
@@ -142,7 +142,7 @@ Two maintenance ledgers now exist:
 Use `docs/project-improvement-status.md` as the source of truth for detailed item status. The immediate sequence is:
 
 1. Keep standalone `RLInfraWiki/` validation and main repo `make demo` green when changing the submodule.
-2. Switch `.gitmodules` to `https://github.com/byxshr/RLInfraWiki` once the remote exists.
+2. Push the main repo migration commit so fresh clones can initialize the published standalone submodule.
 3. Add more task contracts from `IMP-004` using the context bundle workflow.
 4. Promote P1 Wiki tracks from `docs/rlinfrawiki-content-status.md`, starting with rollout backend selection and async agentic RL.
 

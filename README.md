@@ -25,9 +25,9 @@ Initialize the RLInfraWiki dependency first:
 git submodule update --init --recursive
 ```
 
-During this migration the future remote `https://github.com/byxshr/RLInfraWiki` was not available, so `.gitmodules` uses `../RLInfraWiki` as the fallback relative URL. In this authoring workspace `.git/config` may override that URL to the local absolute sibling checkout so validation can run before the remote exists. Until the remote is published, `git submodule update --init --recursive` is verified only in a workspace that has the sibling standalone `RLInfraWiki/` checkout or an equivalent local URL override.
+`.gitmodules` uses the relative URL `../RLInfraWiki`, which resolves to the sibling GitHub repository `https://github.com/byxshr/RLInfraWiki` when this repo is cloned from `https://github.com/byxshr/rl-infra-design-agents`. This also preserves fork-friendly submodule behavior. In the original authoring workspace, `.git/config` may still contain a local override to the sibling checkout; run `git submodule sync` to reset local config back to `.gitmodules`.
 
-To switch later:
+To force an explicit absolute URL instead of the relative sibling URL:
 
 ```bash
 git config -f .gitmodules 'submodule..agents/skills/RLInfraWiki.url' https://github.com/byxshr/RLInfraWiki

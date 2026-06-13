@@ -25,11 +25,11 @@ Update this file whenever an improvement item is completed, re-scoped, blocked, 
 
 | area | status | evidence | next_action |
 |---|---|---|---|
-| Core checks | done | `conda run -n rl-infra-design-agents make check` passed with 40 tests. | Keep green after every workflow or content change. |
+| Core checks | done | `conda run -n rl-infra-design-agents make check` passed with 45 tests. | Keep green after every workflow or content change. |
 | P0 RLInfraWiki content | done | Standalone `RLInfraWiki/` is pinned by `.agents/skills/RLInfraWiki` and preserves `slime + Megatron + SGLang weight sync` query/render/review behavior. | Keep standalone validation green before updating the submodule pointer. |
 | Example rendering | done | `make render-example` produced `/tmp/rl-infra-task-workspace` with `context/context_bundle.md`, `context/context_bundle.json`, and `context/context_sources.yaml`. | Use generated context artifacts in review. |
 | Review gate | done | `make review-gate` passed and now rejects missing/invalid context bundles. | Keep no-target-only and page/source ID checks green. |
-| Git state | done | Main repo uses `.agents/skills/RLInfraWiki` as a gitlink pinned to standalone `RLInfraWiki`; tracked `.gitmodules` uses fallback relative URL `../RLInfraWiki`, with local authoring override allowed until the remote exists. | Switch `.gitmodules` to `https://github.com/byxshr/RLInfraWiki` when the remote exists. |
+| Git state | done | Main repo uses `.agents/skills/RLInfraWiki` as a gitlink pinned to standalone `RLInfraWiki`; tracked `.gitmodules` uses relative URL `../RLInfraWiki`, which resolves to published sibling repo `https://github.com/byxshr/RLInfraWiki`. | Push the main repo commit after standalone remote publication. |
 
 ## Improvement Roadmap
 
@@ -37,7 +37,7 @@ Update this file whenever an improvement item is completed, re-scoped, blocked, 
 |---|---|---|---|---|---|---|---|
 | IMP-001 | Golden demo path | P0 | done | Provide a single documented command path that proves the project runs end-to-end. | `make demo` now runs check, renders the slime weight-sync example, validates review gate, and prints workspace/context paths. | `conda run -n rl-infra-design-agents make demo` passed and printed `Review gate passed`. | 2026-06-13 |
 | IMP-002 | Generated workspace quality | P0 | done | Make `/tmp/rl-infra-task-workspace` docs useful for architecture review, not just template output. | Renderer now writes context bundle artifacts and P0 draft/plan sections for primary sync path, full fallback, `weight_version`, `flush_cache`, failure modes, Wiki page IDs, and source IDs. | `make render-example` plus `make review-gate` passed with context artifacts present. | 2026-06-13 |
-| IMP-003 | README quickstart | P0 | done | Make the project immediately runnable from README. | README now documents submodule init, local RLInfraWiki fallback, `make demo`, manual context bundle, render, and review commands. | README answers "how do I run this project now?" from the Quick Start section. | 2026-06-13 |
+| IMP-003 | README quickstart | P0 | done | Make the project immediately runnable from README. | README now documents submodule init through the published `RLInfraWiki` sibling remote, `make demo`, manual context bundle, render, and review commands. | README answers "how do I run this project now?" from the Quick Start section. | 2026-06-13 |
 | IMP-004 | Task contract library | P1 | todo | Cover common RL infra/algorithm design scenarios beyond weight sync. | Add example task contracts for rollout backend selection, async agentic RL pipeline, GRPO infra design, training-inference mismatch debug, and training backend comparison. | Each new contract renders successfully and has required Wiki queries that return relevant pages. | 2026-06-13 |
 | IMP-005 | P1 Wiki evidence | P1 | todo | Promote high-impact P1 Wiki tracks to `code-evidenced`. | Implement rollout backend selection, async agentic RL, Ray orchestration, and training backend comparison entries from `docs/rlinfrawiki-content-status.md`. | Relevant P1 pages cite local repo/doc paths and update the content status ledger. | 2026-06-13 |
 | IMP-006 | Algorithm infra recipe | P1 | todo | Help users design RL algorithm changes, not only infra component choices. | Add a recipe for algorithm-to-infra mapping: rollout fields, old logprobs, KL/reference policy, reward/verifier hooks, stale policy controls, eval metrics, and data contracts. | A GRPO/DAPO-style task can render a design packet with algorithm assumptions mapped to infra requirements. | 2026-06-13 |
@@ -51,7 +51,7 @@ Update this file whenever an improvement item is completed, re-scoped, blocked, 
 1. Keep `make demo`, `make check`, `make render-example`, and `make review-gate` green after any RLInfraWiki submodule update.
 2. Add task contracts from `IMP-004` using the context bundle workflow.
 3. Promote P1 Wiki tracks from `IMP-005` in the standalone `RLInfraWiki/` repository, then update the main repo gitlink.
-4. Switch `.gitmodules` to `https://github.com/byxshr/RLInfraWiki` once the remote repository is available.
+4. Push the main repo migration commit after confirming the standalone remote contains commit `7768121`.
 
 ## Maintenance Rules
 

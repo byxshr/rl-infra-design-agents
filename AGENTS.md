@@ -8,7 +8,7 @@ The default implementation workflow is Humanize-compatible RLCR: Claude implemen
 
 ## RLInfraWiki dependency
 
-Use `.agents/skills/RLInfraWiki/` as the RLInfraWiki skill location. It is a standalone repository pinned by the main repo as a local submodule-style dependency. Because the remote was unavailable during migration, `.gitmodules` uses `../RLInfraWiki` as the fallback relative URL; this authoring workspace may use a local `.git/config` override to the sibling checkout. When the remote is available, switch the URL to `https://github.com/byxshr/RLInfraWiki` and run `git submodule sync && git submodule update --init --recursive`.
+Use `.agents/skills/RLInfraWiki/` as the RLInfraWiki skill location. It is a standalone repository pinned by the main repo as a submodule-style dependency. `.gitmodules` uses `../RLInfraWiki`, which resolves to the sibling GitHub repository `https://github.com/byxshr/RLInfraWiki` for normal clones of `https://github.com/byxshr/rl-infra-design-agents`. If a local authoring workspace has a custom `.git/config` submodule URL override, run `git submodule sync && git submodule update --init --recursive` to return to the tracked configuration.
 
 Before RL infrastructure design work:
 
