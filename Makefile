@@ -1,7 +1,8 @@
-.PHONY: setup validate test status indices check render-example review-gate demo render-slime-grpo-contract review-slime-grpo-contract demo-slime-grpo-contract
+.PHONY: setup validate test status indices check render-example review-gate demo render-slime-grpo-contract review-slime-grpo-contract demo-slime-grpo-contract render-rollout-backend-selection review-rollout-backend-selection demo-rollout-backend-selection
 
 WORKSPACE ?= /tmp/rl-infra-task-workspace
 GRPO_WORKSPACE ?= /tmp/slime-grpo-rlvr-data-contract-workspace
+ROLLOUT_BACKEND_WORKSPACE ?= /tmp/rollout-backend-selection-workspace
 PYTHON ?= python
 
 setup:
@@ -54,3 +55,20 @@ demo-slime-grpo-contract: render-slime-grpo-contract review-slime-grpo-contract
 	$(PYTHON) .agents/skills/RLInfraWiki/scripts/query.py "slime GRPO RLVR algorithm data contract" --limit 8
 	@echo "Slime GRPO/RLVR data-contract workspace: $(GRPO_WORKSPACE)"
 	@echo "Context bundle: $(GRPO_WORKSPACE)/context/context_bundle.md"
+
+render-rollout-backend-selection:
+	$(PYTHON) .agents/skills/RLInfraWiki/scripts/render_task_bundle.py \
+	  --contract examples/task_contracts/rollout-backend-selection.yaml \
+	  --output $(ROLLOUT_BACKEND_WORKSPACE) \
+	  --force \
+	  --overwrite-human-docs
+	$(PYTHON) .agents/skills/RLInfraWiki/scripts/lock_plan.py \
+	  --workspace $(ROLLOUT_BACKEND_WORKSPACE)
+
+review-rollout-backend-selection:
+	$(PYTHON) .agents/skills/RLInfraWiki/scripts/validate_review_gate.py --workspace $(ROLLOUT_BACKEND_WORKSPACE)
+
+demo-rollout-backend-selection: render-rollout-backend-selection review-rollout-backend-selection
+	$(PYTHON) .agents/skills/RLInfraWiki/scripts/query.py "rollout backend selection SGLang vLLM cache logprob weight update" --limit 8
+	@echo "Rollout backend selection workspace: $(ROLLOUT_BACKEND_WORKSPACE)"
+	@echo "Context bundle: $(ROLLOUT_BACKEND_WORKSPACE)/context/context_bundle.md"

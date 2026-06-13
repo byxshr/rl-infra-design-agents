@@ -41,3 +41,6 @@ jobs:
 
       - name: Render and review slime GRPO/RLVR data-contract path
         run: make demo-slime-grpo-contract
+
+      - name: Render and review rollout backend selection path
+        run: make demo-rollout-backend-selection

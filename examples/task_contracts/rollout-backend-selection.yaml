@@ -1,21 +1,27 @@
 task_name: rollout-backend-selection
-objective: "Compare vLLM and SGLang as rollout engines for RLHF/RLVR/agentic RL infrastructure."
-target_frameworks: [verl, slime, roll, areal]
-reference_frameworks: [vllm, sglang]
-components: [rollout, serving, scheduler, router, weight-sync]
+objective: "Design a target-aware rollout backend selection for verl RLVR/GRPO: compare SGLang and vLLM, choose primary_backend and fallback_backend, and specify cache, logprob, weight update, colocated/disaggregated, PD, validation, source provenance, and non-claim boundaries."
+target_frameworks: [verl]
+reference_frameworks: [sglang, vllm, slime, roll, areal]
+components: [rollout, inference, weight-sync, cache, logprob, observability, router]
 review_mode: humanize-compatible-rlcr
 builder: claude
 reviewer: codex
-deliverables: [docs/goal.md, docs/draft.md, docs/plan.md, docs/comparison.md, docs/validation_matrix.md, docs/risk_register.md]
+deliverables: [docs/goal.md, docs/draft.md, docs/plan.md, docs/architecture.md, docs/interfaces.md, docs/validation_matrix.md, docs/risk_register.md]
 constraints:
   - "No benchmark claim without hardware, source, model, workload, and commit."
-  - "Include batch RLVR and multi-turn agentic cases."
+  - "Do not claim GPU/NCCL/multi-node/performance/production verification without local logs and artifacts."
+  - "Output must include Target, Generic, Cross-Framework, and Validation & Risk context packs."
+  - "Include primary backend, full fallback, weight_version, flush_cache or cache namespace, logprob policy, failure modes, Wiki page IDs, source IDs, claim IDs, and explicit non-claims."
 required_wiki_queries:
-  - "vLLM SGLang rollout backend RL"
-  - "SGLang RL systems refit pause resume"
-  - "vLLM PagedAttention continuous batching"
+  - "rollout backend selection SGLang vLLM cache logprob weight update"
+  - "colocated disaggregated rollout backend RLVR"
+  - "SGLang vLLM PD disaggregation cache logprob"
+  - "stale KV cache inconsistent logprob validation"
 validation_commands:
-  - "python .agents/skills/RLInfraWiki/scripts/query.py 'vLLM SGLang rollout backend RL' --limit 8"
+  - "python .agents/skills/RLInfraWiki/scripts/query.py 'rollout backend selection SGLang vLLM cache logprob weight update' --limit 8"
+  - "python .agents/skills/RLInfraWiki/scripts/compose_context.py --target-framework verl --task 'select rollout backend between SGLang and vLLM for RLVR with cache logprob and weight update risks' --mode design --output /tmp/rollout-backend-selection-context.md"
+  - "python .agents/skills/RLInfraWiki/scripts/validate_context_bundle.py /tmp/rollout-backend-selection-context.md"
 promotion_criteria:
-  - "Decision matrix includes throughput, latency, prefix caching, multi-turn, weight update, deterministic inference, operational complexity, and production alignment."
+  - "Decision matrix includes lifecycle controls, cache/logprob correctness, weight update path, full fallback, colocated/disaggregated/PD topology, operational tradeoffs, validation evidence, and non-claims."
+  - "Rendered bundle cites capability-rollout-backend-selection, comparisons-rollout-backends, backend-sglang, backend-vllm, validation-logprob-consistency, source-vllm-rollout-backend-refs, and source-sglang-rollout-backend-refs."
   - "Codex review has no unresolved P0/P1 issues."
