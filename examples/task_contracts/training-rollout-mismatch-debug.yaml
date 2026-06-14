@@ -1,13 +1,24 @@
 task_name: training-rollout-mismatch-debug
-objective: "Design a debugging workflow for training/rollout logprob and policy-version mismatch in an RL pipeline."
-target_frameworks: [slime, verl]
-reference_frameworks: [vllm, sglang, megatron-lm]
-components: [training, rollout, observability, weight-sync]
+objective: "Design a source-traceable debugging workflow for slime training/rollout mismatch: isolate policy_version, weight_version, stale KV cache, rollout old_logprob versus trainer recompute, token/mask/schema drift, reward/data-buffer handoff, and backend/topology gaps."
+target_frameworks: [slime]
+reference_frameworks: [verl, roll, areal, sglang, vllm]
+components: [training, rollout, observability, data-buffer, weight-sync, cache, logprob]
 review_mode: humanize-compatible-rlcr
 builder: claude
 reviewer: codex
-deliverables: [docs/goal.md, docs/draft.md, docs/plan.md, docs/validation_matrix.md, docs/risk_register.md]
-constraints: ["Evidence must include exact config, policy version, token IDs, logprobs, and source IDs."]
-required_wiki_queries: ["training inference mismatch logprob", "rollout training mismatch SGLang vLLM"]
-validation_commands: ["python .agents/skills/RLInfraWiki/scripts/query.py 'training inference mismatch logprob' --limit 8"]
-promotion_criteria: ["Debug plan covers tokenization, cache, precision, routing, versioning, and replay evidence."]
+deliverables: [docs/goal.md, docs/draft.md, docs/plan.md, docs/architecture.md, docs/interfaces.md, docs/validation_matrix.md, docs/risk_register.md]
+constraints:
+  - "Evidence must include exact config, policy_version, weight_version when applicable, token IDs, masks, logprobs, cache policy, artifact refs, Wiki page IDs, and source IDs."
+  - "Do not claim GPU/NCCL/multi-node/performance/production verification without local logs and artifacts."
+  - "Output must include symptom, evidence-to-collect, hypothesis matrix, replay/recompute checklist, version/cache/logprob/schema matrix, failure isolation order, stop conditions, and non-claims."
+required_wiki_queries:
+  - "training rollout mismatch logprob policy_version cache schema drift"
+  - "debug training rollout mismatch old_logprob trainer recompute"
+  - "stale KV cache sample schema drift stale policy training"
+validation_commands:
+  - "python .agents/skills/RLInfraWiki/scripts/query.py 'training rollout mismatch logprob policy_version cache schema drift' --limit 8"
+  - "python .agents/skills/RLInfraWiki/scripts/compose_context.py --target-framework slime --task 'debug training rollout mismatch old_logprob trainer recompute policy_version weight_version stale KV cache sample schema drift' --mode debug --output /tmp/training-rollout-mismatch-context.md"
+  - "python .agents/skills/RLInfraWiki/scripts/validate_context_bundle.py /tmp/training-rollout-mismatch-context.md"
+promotion_criteria:
+  - "Debug packet covers version identity, cache policy, logprob replay/recompute, schema/mask/tokenization, reward/data-buffer handoff, backend/topology, stop conditions, and non-claims."
+  - "Rendered bundle cites recipe-debug-training-rollout-mismatch, observability-training-inference-mismatch, validation-logprob-consistency, validation-train-infer-schema-match, failure-sample-schema-drift, and failure-stale-policy-training."

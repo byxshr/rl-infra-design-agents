@@ -44,3 +44,6 @@ jobs:
 
       - name: Render and review rollout backend selection path
         run: make demo-rollout-backend-selection
+
+      - name: Render and review training/rollout mismatch debug path
+        run: make demo-training-rollout-mismatch-debug

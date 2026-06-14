@@ -66,6 +66,14 @@ conda run -n rl-infra-design-agents make demo-rollout-backend-selection
 
 Expected result: `/tmp/rollout-backend-selection-workspace` is rendered and `Review gate passed` is printed. This task designs a target-aware, cross-framework selection packet for SGLang versus vLLM as a rollout backend for verl RLVR/GRPO. The rendered plan includes `primary_backend`, `fallback_backend`, primary weight update path, full fallback, `weight_version`, cache policy, logprob policy, failure modes, Wiki page IDs, source IDs, and explicit non-claims for GPU/NCCL/multi-node/performance/production verification.
 
+Run the training/rollout mismatch debugging demo:
+
+```bash
+conda run -n rl-infra-design-agents make demo-training-rollout-mismatch-debug
+```
+
+Expected result: `/tmp/training-rollout-mismatch-debug-workspace` is rendered and `Review gate passed` is printed. This task designs a source-traceable debugging packet for slime training/rollout mismatch, including `policy_version`, `weight_version`, stale KV cache, rollout `old_logprob` versus trainer recompute, token/mask/schema drift, reward/data-buffer handoff, Wiki page IDs, source IDs, and explicit non-claims for GPU/NCCL/multi-node/performance/production verification.
+
 Manual sequence:
 
 ```bash

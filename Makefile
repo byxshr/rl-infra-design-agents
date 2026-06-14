@@ -1,8 +1,9 @@
-.PHONY: setup validate test status indices check render-example review-gate demo render-slime-grpo-contract review-slime-grpo-contract demo-slime-grpo-contract render-rollout-backend-selection review-rollout-backend-selection demo-rollout-backend-selection
+.PHONY: setup validate test status indices check render-example review-gate demo render-slime-grpo-contract review-slime-grpo-contract demo-slime-grpo-contract render-rollout-backend-selection review-rollout-backend-selection demo-rollout-backend-selection render-training-rollout-mismatch-debug review-training-rollout-mismatch-debug demo-training-rollout-mismatch-debug
 
 WORKSPACE ?= /tmp/rl-infra-task-workspace
 GRPO_WORKSPACE ?= /tmp/slime-grpo-rlvr-data-contract-workspace
 ROLLOUT_BACKEND_WORKSPACE ?= /tmp/rollout-backend-selection-workspace
+MISMATCH_DEBUG_WORKSPACE ?= /tmp/training-rollout-mismatch-debug-workspace
 PYTHON ?= python
 
 setup:
@@ -72,3 +73,20 @@ demo-rollout-backend-selection: render-rollout-backend-selection review-rollout-
 	$(PYTHON) .agents/skills/RLInfraWiki/scripts/query.py "rollout backend selection SGLang vLLM cache logprob weight update" --limit 8
 	@echo "Rollout backend selection workspace: $(ROLLOUT_BACKEND_WORKSPACE)"
 	@echo "Context bundle: $(ROLLOUT_BACKEND_WORKSPACE)/context/context_bundle.md"
+
+render-training-rollout-mismatch-debug:
+	$(PYTHON) .agents/skills/RLInfraWiki/scripts/render_task_bundle.py \
+	  --contract examples/task_contracts/training-rollout-mismatch-debug.yaml \
+	  --output $(MISMATCH_DEBUG_WORKSPACE) \
+	  --force \
+	  --overwrite-human-docs
+	$(PYTHON) .agents/skills/RLInfraWiki/scripts/lock_plan.py \
+	  --workspace $(MISMATCH_DEBUG_WORKSPACE)
+
+review-training-rollout-mismatch-debug:
+	$(PYTHON) .agents/skills/RLInfraWiki/scripts/validate_review_gate.py --workspace $(MISMATCH_DEBUG_WORKSPACE)
+
+demo-training-rollout-mismatch-debug: render-training-rollout-mismatch-debug review-training-rollout-mismatch-debug
+	$(PYTHON) .agents/skills/RLInfraWiki/scripts/query.py "training rollout mismatch logprob policy_version cache schema drift" --limit 8
+	@echo "Training/rollout mismatch debug workspace: $(MISMATCH_DEBUG_WORKSPACE)"
+	@echo "Context bundle: $(MISMATCH_DEBUG_WORKSPACE)/context/context_bundle.md"
