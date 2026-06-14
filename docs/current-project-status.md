@@ -60,8 +60,9 @@ Last validated commands:
 | command | result |
 |---|---|
 | `git submodule update --init --recursive` | Passed in the authoring workspace. The standalone remote now exists at `https://github.com/byxshr/RLInfraWiki`; a fresh remote clone should resolve `.gitmodules` URL `../RLInfraWiki` to the sibling GitHub repository after the main repo commit is pushed. |
-| `conda run -n rl-infra-design-agents make check` | Passed: generated query indices current, RLInfraWiki validation passed, content ledger validation passed, `57 passed`. |
+| `conda run -n rl-infra-design-agents make check` | Passed: generated query indices current, RLInfraWiki validation passed, content ledger validation passed, golden path snapshot tests passed, `65 passed`. |
 | `python scripts/validate_content_ledger.py` | Passed: `docs/rlinfrawiki-content-status.md` matches the pinned `RLInfraWiki` page IDs, paths, status enums, themes, source IDs, and review-ready structure checks. |
+| `conda run -n rl-infra-design-agents make validate-golden-paths` | Passed: `8 passed`; four golden paths render into temporary workspaces, pass review gate, keep context sidecars, retain key semantic anchors, and enforce runtime-claim guard behavior. |
 | `conda run -n rl-infra-design-agents make demo` | Passed: check, render, review gate, P0 query; printed workspace/context paths. |
 | `conda run -n rl-infra-design-agents make demo-slime-grpo-contract` | Passed: rendered and review-gated a slime-compatible GRPO/RLVR algorithm data-contract workspace. |
 | `conda run -n rl-infra-design-agents make demo-rollout-backend-selection` | Passed: rendered and review-gated `/tmp/rollout-backend-selection-workspace`, queried rollout backend selection pages, and printed workspace/context paths. |
@@ -72,7 +73,7 @@ Last validated commands:
 | `python scripts/validate.py` in standalone `RLInfraWiki/` | Passed. |
 | `python scripts/generate_indices.py --check` in standalone `RLInfraWiki/` | Passed. |
 | `python scripts/compose_context.py ... && python scripts/validate_context_bundle.py ...` in standalone `RLInfraWiki/` | Passed. |
-| `conda run -n rl-infra-design-agents pytest -q` via the main repo plus pinned `RLInfraWiki` dependency | Passed through `make check`: `57 passed`. Bare base `pytest` previously exited 139 in this environment, so conda env is the validated test runner. |
+| `conda run -n rl-infra-design-agents python -m pytest -q` via the main repo plus pinned `RLInfraWiki` dependency | Passed through `make check`: `65 passed`. Bare base `pytest` previously exited 139 in this environment, so conda env is the validated test runner. |
 
 ## Completed Progress
 

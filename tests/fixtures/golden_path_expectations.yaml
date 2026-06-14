@@ -1,0 +1,99 @@
+golden_paths:
+  - name: p0-weight-sync
+    contract: examples/task_contracts/slime-weight-sync.yaml
+    workspace: p0-weight-sync
+    required_context_files:
+      - context/context_bundle.md
+      - context/context_bundle.json
+      - context/context_sources.yaml
+    scan_files:
+      - docs/plan.md
+      - docs/interfaces.md
+      - docs/risk_register.md
+    must_contain:
+      - P0 Sync Contract
+      - weight_version
+      - flush_cache
+      - full fallback
+      - Wiki/source IDs
+      - source-slime-weight-sync-code
+      - source-sglang-rl-weight-update-refs
+    must_not_contain:
+      - Debugging Packet
+      - Replay/Recompute Checklist
+      - primary_backend
+      - fallback_backend
+
+  - name: slime-grpo-rlvr-data-contract
+    contract: examples/task_contracts/slime-grpo-rlvr-data-contract.yaml
+    workspace: slime-grpo-rlvr-data-contract
+    required_context_files:
+      - context/context_bundle.md
+      - context/context_bundle.json
+      - context/context_sources.yaml
+    scan_files:
+      - docs/plan.md
+      - docs/interfaces.md
+      - docs/risk_register.md
+    must_contain:
+      - old_logprob
+      - group_id
+      - policy_version
+      - Algorithm Data Contract
+      - validation-logprob-consistency
+      - failure-sample-schema-drift
+    must_not_contain:
+      - P0 Sync Contract
+      - Debugging Packet
+      - primary_backend
+      - fallback_backend
+
+  - name: rollout-backend-selection
+    contract: examples/task_contracts/rollout-backend-selection.yaml
+    workspace: rollout-backend-selection
+    required_context_files:
+      - context/context_bundle.md
+      - context/context_bundle.json
+      - context/context_sources.yaml
+    scan_files:
+      - docs/plan.md
+      - docs/interfaces.md
+      - docs/risk_register.md
+    must_contain:
+      - primary_backend
+      - fallback_backend
+      - cache policy
+      - logprob policy
+      - Non-Claims
+      - source-vllm-rollout-backend-refs
+      - source-sglang-rollout-backend-refs
+    must_not_contain:
+      - P0 Sync Contract
+      - Debugging Packet
+      - Replay/Recompute Checklist
+
+  - name: training-rollout-mismatch-debug
+    contract: examples/task_contracts/training-rollout-mismatch-debug.yaml
+    workspace: training-rollout-mismatch-debug
+    required_context_files:
+      - context/context_bundle.md
+      - context/context_bundle.json
+      - context/context_sources.yaml
+    scan_files:
+      - docs/plan.md
+      - docs/interfaces.md
+      - docs/risk_register.md
+    must_contain:
+      - Debugging Packet
+      - Replay/Recompute Checklist
+      - Version Cache Logprob Schema Matrix
+      - policy_version
+      - weight_version
+      - Non-Claims
+      - recipe-debug-training-rollout-mismatch
+      - failure-sample-schema-drift
+      - validation-logprob-consistency
+    must_not_contain:
+      - P0 Sync Contract
+      - primary_backend
+      - fallback_backend

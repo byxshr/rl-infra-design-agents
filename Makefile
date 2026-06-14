@@ -1,4 +1,4 @@
-.PHONY: setup validate test status indices validate-ledger check render-example review-gate demo render-slime-grpo-contract review-slime-grpo-contract demo-slime-grpo-contract render-rollout-backend-selection review-rollout-backend-selection demo-rollout-backend-selection render-training-rollout-mismatch-debug review-training-rollout-mismatch-debug demo-training-rollout-mismatch-debug
+.PHONY: setup validate test status indices validate-ledger validate-golden-paths check render-example review-gate demo render-slime-grpo-contract review-slime-grpo-contract demo-slime-grpo-contract render-rollout-backend-selection review-rollout-backend-selection demo-rollout-backend-selection render-training-rollout-mismatch-debug review-training-rollout-mismatch-debug demo-training-rollout-mismatch-debug
 
 WORKSPACE ?= /tmp/rl-infra-task-workspace
 GRPO_WORKSPACE ?= /tmp/slime-grpo-rlvr-data-contract-workspace
@@ -15,6 +15,9 @@ validate:
 validate-ledger:
 	$(PYTHON) scripts/validate_content_ledger.py
 
+validate-golden-paths:
+	$(PYTHON) -m pytest -q tests/test_golden_path_snapshots.py
+
 indices:
 	$(PYTHON) .agents/skills/RLInfraWiki/scripts/generate_indices.py
 
@@ -25,7 +28,7 @@ check:
 	$(PYTHON) .agents/skills/RLInfraWiki/scripts/generate_indices.py --check
 	$(PYTHON) .agents/skills/RLInfraWiki/scripts/validate.py
 	$(PYTHON) scripts/validate_content_ledger.py
-	pytest -q
+	$(PYTHON) -m pytest -q
 
 status:
 	$(PYTHON) .agents/skills/RLInfraWiki/scripts/repo_status.py
