@@ -34,4 +34,22 @@ This is a preparation step, not an automatic Humanize launch. Enter the prepared
 /humanize:start-rlcr-loop docs/plan.md
 ```
 
-Humanize rounds are still external to this repository's review ledger until IMP-014. Keep RLInfraWiki page/source IDs, non-claims, validation evidence, and risk-register updates intact so those rounds can be imported later without losing provenance.
+After Humanize produces a round under `.humanize/rlcr/<timestamp>/`, import it back into this repository's RLCR workspace:
+
+```bash
+conda run -n rl-infra-design-agents make import-humanize-round \
+  HUMANIZE_WORKSPACE=/tmp/rlinfra-humanize-task-workspace \
+  ROUND=1
+```
+
+The importer validates the bridge schema, warns when copied workspace metadata still points at an older path, reads `round-N-summary.md` and `round-N-review-result.md`, writes `review_rounds/round-001/claude_response.md`, `codex_review.md`, `parsed_issues.jsonl`, and `humanize_round_metadata.json`, then updates the workspace-level `review_issues.jsonl` through the existing parser and append scripts. It preserves raw Humanize output while normalizing findings into the parser-compatible `### P1:` style used by the review gate, and records whether source text needed UTF-8 replacement characters.
+
+Run the gate in review-required mode after import:
+
+```bash
+conda run -n rl-infra-design-agents python .agents/skills/RLInfraWiki/scripts/validate_review_gate.py \
+  --workspace /tmp/rlinfra-humanize-task-workspace \
+  --require-review
+```
+
+COMPLETE/no-finding rounds can pass the review-required gate; imported open P0/P1/P2 findings still block promotion. Keep RLInfraWiki page/source IDs, non-claims, validation evidence, and risk-register updates intact throughout the Humanize loop. IMP-015 remains the boundary for a stricter one-command start wrapper.

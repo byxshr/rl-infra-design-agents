@@ -26,7 +26,25 @@ Then open Claude Code in `/tmp/rlinfra-humanize-task-workspace` and run:
 /humanize:start-rlcr-loop docs/plan.md
 ```
 
-The bridge prepares the workspace only; it does not start Claude Code or import Humanize review rounds. Round import/export remains the IMP-014 boundary. Preserve `context/context_bundle.md`, `context/context_bundle.json`, `context/context_sources.yaml`, RLInfraWiki page/source IDs, non-claims, validation evidence, and risk updates through the Humanize loop. Use `.humanize/rlinfra_bridge.json` to recover the bridge schema version, main-repo commit, pinned `RLInfraWiki` commit, target repo/diff-base validation status, and command provenance for later import.
+The bridge prepares the workspace only; it does not start Claude Code. Preserve `context/context_bundle.md`, `context/context_bundle.json`, `context/context_sources.yaml`, RLInfraWiki page/source IDs, non-claims, validation evidence, and risk updates through the Humanize loop. Use `.humanize/rlinfra_bridge.json` to recover the bridge schema version, main-repo commit, pinned `RLInfraWiki` commit, target repo/diff-base validation status, and command provenance for round import.
+
+After Humanize writes `.humanize/rlcr/<timestamp>/round-N-summary.md` and `round-N-review-result.md`, import the round:
+
+```bash
+make import-humanize-round \
+  HUMANIZE_WORKSPACE=/tmp/rlinfra-humanize-task-workspace \
+  ROUND=1
+```
+
+If more than one Humanize loop directory exists and auto-discovery is ambiguous, pass `HUMANIZE_LOOP_DIR=/tmp/rlinfra-humanize-task-workspace/.humanize/rlcr/<timestamp>`. The importer validates the bridge schema, warns when copied workspace metadata is stale, writes `review_rounds/round-001/`, updates `review_issues.jsonl`, preserves raw Humanize review output, and lets the existing gate reason about imported P0/P1/P2 findings:
+
+```bash
+python .agents/skills/RLInfraWiki/scripts/validate_review_gate.py \
+  --workspace /tmp/rlinfra-humanize-task-workspace \
+  --require-review
+```
+
+IMP-015 remains the boundary for a stricter one-command start wrapper.
 
 Repository-compatible commands:
 

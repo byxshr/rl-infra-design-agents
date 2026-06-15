@@ -99,6 +99,24 @@ It does not automatically start Claude Code or run the Humanize plugin. Open Cla
 /humanize:start-rlcr-loop docs/plan.md
 ```
 
+After Humanize writes `.humanize/rlcr/<timestamp>/round-N-summary.md` and `round-N-review-result.md`, import the round back into this workspace's RLCR ledger:
+
+```bash
+conda run -n rl-infra-design-agents make import-humanize-round \
+  HUMANIZE_WORKSPACE=/tmp/rlinfra-humanize-task-workspace \
+  ROUND=1
+```
+
+Then require a Codex review artifact in the local gate:
+
+```bash
+conda run -n rl-infra-design-agents python .agents/skills/RLInfraWiki/scripts/validate_review_gate.py \
+  --workspace /tmp/rlinfra-humanize-task-workspace \
+  --require-review
+```
+
+The importer validates the bridge schema, copies the Humanize summary/review into `review_rounds/round-001/`, normalizes `[P0]` to `[P3]` findings into parser-compatible headings, preserves the raw Humanize review output, writes `humanize_round_metadata.json` with file hashes, bridge provenance, stale-workspace warnings, and UTF-8 replacement markers, and updates `review_issues.jsonl`. COMPLETE/no-finding rounds satisfy `--require-review`; open P0/P1/P2 findings still block promotion through the existing review gate.
+
 If Humanize or the `codex` CLI is unavailable, preparation still succeeds by default and records prerequisite warnings in `.humanize/rlinfra_bridge.json`. Add `--strict-prereqs` when missing local Humanize/Codex prerequisites should fail the bridge command.
 
 Manual sequence:
