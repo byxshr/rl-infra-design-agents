@@ -35,8 +35,8 @@ def test_current_content_ledger_passes():
 
 def test_invalid_status_is_rejected(tmp_path):
     text = LEDGER.read_text(encoding="utf-8").replace(
-        "| async agentic RL | P1 | indexed | code-evidenced |",
-        "| async agentic RL | P1 | almost-done | code-evidenced |",
+        "| async agentic RL | P1 | code-evidenced | review-ready |",
+        "| async agentic RL | P1 | almost-done | review-ready |",
         1,
     )
     result = run_validator(write_ledger(tmp_path, text))
@@ -70,11 +70,23 @@ def test_unknown_page_source_id_is_rejected(tmp_path):
 
 
 def test_review_ready_page_requires_review_structure(tmp_path):
+    wiki_copy = tmp_path / "RLInfraWiki"
+    shutil.copytree(WIKI_ROOT, wiki_copy, ignore=shutil.ignore_patterns("__pycache__", ".pytest_cache", ".git"))
+    page = wiki_copy / "wiki" / "agentic" / "tool-calling.md"
+    original = page.read_text(encoding="utf-8")
+    frontmatter = original.split("---", 2)[1]
+    page.write_text(
+        f"---{frontmatter}---\n\n"
+        "# Tool Calling\n\n"
+        "This deliberately minimal body keeps valid frontmatter and sources but omits review-ready sections.\n",
+        encoding="utf-8",
+    )
+
     text = LEDGER.read_text(encoding="utf-8").replace(
-        "| agentic-tool-calling | wiki/agentic/tool-calling.md | agentic | async agentic RL | indexed | code-evidenced |",
+        "| agentic-tool-calling | wiki/agentic/tool-calling.md | agentic | async agentic RL | code-evidenced | review-ready |",
         "| agentic-tool-calling | wiki/agentic/tool-calling.md | agentic | async agentic RL | review-ready | review-ready |",
         1,
     )
-    result = run_validator(write_ledger(tmp_path, text))
+    result = run_validator(write_ledger(tmp_path, text), wiki_copy)
     assert result.returncode == 1
     assert "review-ready page 'agentic-tool-calling' missing review structure" in result.stdout
