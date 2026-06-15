@@ -60,7 +60,7 @@ Last validated commands:
 | command | result |
 |---|---|
 | `git submodule update --init --recursive` | Passed in the authoring workspace. The standalone remote now exists at `https://github.com/byxshr/RLInfraWiki`; a fresh remote clone should resolve `.gitmodules` URL `../RLInfraWiki` to the sibling GitHub repository after the main repo commit is pushed. |
-| `conda run -n rl-infra-design-agents make check` | Passed: generated query indices current, RLInfraWiki validation passed, content ledger validation passed, golden path snapshot tests passed, `70 passed`. |
+| `conda run -n rl-infra-design-agents make check` | Passed: generated query indices current, RLInfraWiki validation passed, SourcePack metadata validation passed, content ledger validation passed, golden path snapshot tests passed, `77 passed`. |
 | `python scripts/validate_content_ledger.py` | Passed: `docs/rlinfrawiki-content-status.md` matches the pinned `RLInfraWiki` page IDs, paths, status enums, themes, source IDs, and review-ready structure checks. |
 | `conda run -n rl-infra-design-agents make validate-golden-paths` | Passed: `8 passed`; four golden paths render into temporary workspaces, pass review gate, keep context sidecars, retain key semantic anchors, and enforce runtime-claim guard behavior. |
 | `conda run -n rl-infra-design-agents make demo` | Passed: check, render, review gate, P0 query; printed workspace/context paths. |
@@ -72,10 +72,14 @@ Last validated commands:
 | GitHub Actions `validate` workflow | Updated: checkout with recursive submodules, install dev dependencies, run `make check`, `make render-example`, `make review-gate`, P0 query smoke, slime GRPO/RLVR data-contract demo, rollout backend selection demo, and training/rollout mismatch debug demo on push/PR. First remote Actions run should be checked after push. |
 | `python scripts/validate.py` in standalone `RLInfraWiki/` | Passed. |
 | `python scripts/generate_indices.py --check` in standalone `RLInfraWiki/` | Passed. |
+| `python scripts/verify_source_refs.py` in standalone `RLInfraWiki/` | Passed: metadata validation succeeded with 9 legacy hash warnings for `sha256: source-reported` refs. |
+| `python scripts/verify_source_refs.py --check-local --source-root ..` in standalone `RLInfraWiki/` | Passed: sibling local clones matched recorded commits, paths, line ranges, and available snippet hashes; legacy hash placeholders remained warnings. |
+| `python scripts/refresh_sources.py --dry-run --source-root ..` in standalone `RLInfraWiki/` | Passed: produced a non-mutating source refresh report with no drift errors and 9 legacy hash warnings. |
+| `conda run -n rl-infra-design-agents make validate-source-drift SOURCE_ROOT=..` | Passed: main repo wrapper ran the local SourcePack drift checker against sibling clones. |
 | `python scripts/compose_context.py ... && python scripts/validate_context_bundle.py ...` in standalone `RLInfraWiki/` | Passed. |
 | `python .agents/skills/RLInfraWiki/scripts/query.py 'async agentic RL Ray orchestration tool calling multi-turn rollout stale policy' --limit 10` | Passed: returned agentic tool-calling, Ray multi-role, OpenAI-compatible agent app, multi-turn environment, orchestration options, async rollout, AReaL, and ROLL pages in the top 10. |
 | `python .agents/skills/RLInfraWiki/scripts/compare_frameworks.py areal roll --capability async-rollout` | Passed: both AReaL and ROLL report `source-reported` async rollout evidence from SourcePack-backed sources. |
-| `conda run -n rl-infra-design-agents python -m pytest -q` via the main repo plus pinned `RLInfraWiki` dependency | Passed through `make check`: `70 passed`. Bare base `pytest` previously exited 139 in this environment, so conda env is the validated test runner. |
+| `conda run -n rl-infra-design-agents python -m pytest -q` via the main repo plus pinned `RLInfraWiki` dependency | Passed through `make check`: `77 passed`. Bare base `pytest` previously exited 139 in this environment, so conda env is the validated test runner. |
 
 ## Completed Progress
 
@@ -156,7 +160,16 @@ Top-level `RLInfraWiki/` is now the canonical skill root and RL infra dictionary
 - Unknown-framework tooling: `map_framework.py`, `plan_adapter.py`, `diff_capabilities.py`, `compare_frameworks.py`, `search_symbols.py`, `explain.py`, `resolve_alias.py`.
 - First dictionary layer: concept, capability, interface, algorithm, framework-profile, failure-mode, validation-pattern, and adapter-recipe pages.
 
-The main repo pins standalone commit `b34816b` at `.agents/skills/RLInfraWiki`. `.gitmodules` uses the relative URL `../RLInfraWiki`, which resolves to the sibling GitHub repository `https://github.com/byxshr/RLInfraWiki` for normal clones of `https://github.com/byxshr/rl-infra-design-agents`.
+The main repo pins standalone commit `916c0a8` at `.agents/skills/RLInfraWiki`. `.gitmodules` uses the relative URL `../RLInfraWiki`, which resolves to the sibling GitHub repository `https://github.com/byxshr/RLInfraWiki` for normal clones of `https://github.com/byxshr/rl-infra-design-agents`.
+
+### Source Refresh / Drift Checker
+
+`RLInfraWiki` now has a non-mutating SourcePack refresh workflow:
+
+- `verify_source_refs.py` validates source-ref metadata in CI-safe mode and is included in main repo `make check`.
+- `verify_source_refs.py --check-local --source-root ..` verifies sibling clone commits, paths, line ranges, and real snippet hashes for local source refresh work.
+- `refresh_sources.py --dry-run --source-root ..` renders a refresh report without fetching, rewriting manifests, or vendoring upstream code.
+- Legacy `sha256: source-reported` refs are warnings by default and become failures only with `--strict-hash`.
 
 ### Source Manifests
 
