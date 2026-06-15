@@ -74,6 +74,33 @@ conda run -n rl-infra-design-agents make demo-training-rollout-mismatch-debug
 
 Expected result: `/tmp/training-rollout-mismatch-debug-workspace` is rendered and `Review gate passed` is printed. This task designs a source-traceable debugging packet for slime training/rollout mismatch, including `policy_version`, `weight_version`, stale KV cache, rollout `old_logprob` versus trainer recompute, token/mask/schema drift, reward/data-buffer handoff, Wiki page IDs, source IDs, and explicit non-claims for GPU/NCCL/multi-node/performance/production verification.
 
+## Humanize-ready task
+
+Prepare a real RL infra task contract as a workspace that can be handed to Humanize from Claude Code:
+
+```bash
+conda run -n rl-infra-design-agents make prepare-humanize-task \
+  CONTRACT=examples/task_contracts/training-rollout-mismatch-debug.yaml \
+  HUMANIZE_WORKSPACE=/tmp/rlinfra-humanize-task-workspace \
+  TARGET_REPO=/path/to/target/repo \
+  DIFF_BASE=main
+```
+
+This command renders the task bundle, validates the RLInfraWiki context bundle, locks `docs/plan.md`, runs the pre-review gate without requiring an existing Codex review, and writes:
+
+- `/tmp/rlinfra-humanize-task-workspace/humanize_start.md`
+- `/tmp/rlinfra-humanize-task-workspace/.humanize/rlinfra_bridge.json`
+
+The bridge metadata includes a schema version, main-repo commit, pinned `RLInfraWiki` commit, target repo/diff-base validation status, context paths, plan lock path, prerequisite warnings, and the pinned commands that were run. Command stdout/stderr in metadata is a bounded summary with truncation flags; the live command output remains on the terminal. `--strict-prereqs` returns exit code `2` when the workspace was prepared but Humanize/Codex/target prerequisites have warnings.
+
+It does not automatically start Claude Code or run the Humanize plugin. Open Claude Code in the prepared workspace, then run:
+
+```text
+/humanize:start-rlcr-loop docs/plan.md
+```
+
+If Humanize or the `codex` CLI is unavailable, preparation still succeeds by default and records prerequisite warnings in `.humanize/rlinfra_bridge.json`. Add `--strict-prereqs` when missing local Humanize/Codex prerequisites should fail the bridge command.
+
 Manual sequence:
 
 ```bash
