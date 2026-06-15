@@ -17,10 +17,10 @@ validate-ledger:
 	$(PYTHON) scripts/validate_content_ledger.py
 
 validate-source-refs:
-	$(PYTHON) .agents/skills/RLInfraWiki/scripts/verify_source_refs.py
+	$(PYTHON) .agents/skills/RLInfraWiki/scripts/verify_source_refs.py --strict-hash
 
 validate-source-drift:
-	$(PYTHON) .agents/skills/RLInfraWiki/scripts/verify_source_refs.py --check-local --source-root $(SOURCE_ROOT)
+	$(PYTHON) .agents/skills/RLInfraWiki/scripts/verify_source_refs.py --check-local --source-root $(SOURCE_ROOT) --strict-hash
 
 validate-golden-paths:
 	$(PYTHON) -m pytest -q tests/test_golden_path_snapshots.py
@@ -34,7 +34,7 @@ review-gate:
 check:
 	$(PYTHON) .agents/skills/RLInfraWiki/scripts/generate_indices.py --check
 	$(PYTHON) .agents/skills/RLInfraWiki/scripts/validate.py
-	$(PYTHON) .agents/skills/RLInfraWiki/scripts/verify_source_refs.py
+	$(PYTHON) .agents/skills/RLInfraWiki/scripts/verify_source_refs.py --strict-hash
 	$(PYTHON) scripts/validate_content_ledger.py
 	$(PYTHON) -m pytest -q
 
