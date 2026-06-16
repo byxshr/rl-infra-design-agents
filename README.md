@@ -76,24 +76,29 @@ Expected result: `/tmp/training-rollout-mismatch-debug-workspace` is rendered an
 
 ## Humanize-ready task
 
-Prepare a real RL infra task contract as a workspace that can be handed to Humanize from Claude Code:
+Use the start wrapper as the recommended entry for a real RL infra task contract:
 
 ```bash
-conda run -n rl-infra-design-agents make prepare-humanize-task \
+conda run -n rl-infra-design-agents make start-humanize-task \
   CONTRACT=examples/task_contracts/training-rollout-mismatch-debug.yaml \
   HUMANIZE_WORKSPACE=/tmp/rlinfra-humanize-task-workspace \
   TARGET_REPO=/path/to/target/repo \
-  DIFF_BASE=main
+  DIFF_BASE=main \
+  ROUND=1
 ```
 
-This command renders the task bundle, validates the RLInfraWiki context bundle, locks `docs/plan.md`, runs the pre-review gate without requiring an existing Codex review, and writes:
+This command runs the IMP-013 preparation flow, then prints and records the operator steps needed to start Humanize in Claude Code, import the produced round, and run the review gate. It writes:
 
+- `/tmp/rlinfra-humanize-task-workspace/humanize_operator.md`
 - `/tmp/rlinfra-humanize-task-workspace/humanize_start.md`
+- `/tmp/rlinfra-humanize-task-workspace/.humanize/rlinfra_operator.json`
 - `/tmp/rlinfra-humanize-task-workspace/.humanize/rlinfra_bridge.json`
 
-The bridge metadata includes a schema version, main-repo commit, pinned `RLInfraWiki` commit, target repo/diff-base validation status, context paths, plan lock path, prerequisite warnings, and the pinned commands that were run. Command stdout/stderr in metadata is a bounded summary with truncation flags; the live command output remains on the terminal. `--strict-prereqs` returns exit code `2` when the workspace was prepared but Humanize/Codex/target prerequisites have warnings.
+The wrapper does not automatically start Claude Code or run the Humanize plugin. It prepares the workspace and prints the next commands. Open Claude Code in the prepared workspace, then run:
 
-It does not automatically start Claude Code or run the Humanize plugin. Open Claude Code in the prepared workspace, then run:
+```bash
+cd /tmp/rlinfra-humanize-task-workspace
+```
 
 ```text
 /humanize:start-rlcr-loop docs/plan.md
@@ -107,6 +112,8 @@ conda run -n rl-infra-design-agents make import-humanize-round \
   ROUND=1
 ```
 
+If more than one loop directory exists, add `HUMANIZE_LOOP_DIR=/tmp/rlinfra-humanize-task-workspace/.humanize/rlcr/<timestamp>`.
+
 Then require a Codex review artifact in the local gate:
 
 ```bash
@@ -117,7 +124,17 @@ conda run -n rl-infra-design-agents python .agents/skills/RLInfraWiki/scripts/va
 
 The importer validates the bridge schema, copies the Humanize summary/review into `review_rounds/round-001/`, normalizes `[P0]` to `[P3]` findings into parser-compatible headings, preserves the raw Humanize review output, writes `humanize_round_metadata.json` with file hashes, bridge provenance, stale-workspace warnings, and UTF-8 replacement markers, and updates `review_issues.jsonl`. COMPLETE/no-finding rounds satisfy `--require-review`; open P0/P1/P2 findings still block promotion through the existing review gate.
 
-If Humanize or the `codex` CLI is unavailable, preparation still succeeds by default and records prerequisite warnings in `.humanize/rlinfra_bridge.json`. Add `--strict-prereqs` when missing local Humanize/Codex prerequisites should fail the bridge command.
+The operator metadata mirrors the bridge metadata path and records schema version, contract, workspace, target repo, diff base, round, prerequisite warnings, and the exact prepare/start/import/gate commands. If Humanize or the `codex` CLI is unavailable, preparation still succeeds by default and records prerequisite warnings in `.humanize/rlinfra_bridge.json` and `.humanize/rlinfra_operator.json`. Add `--strict-prereqs` when missing local Humanize/Codex prerequisites should fail the wrapper with the same exit code as `prepare_humanize_task.py`.
+
+The lower-level preparation entry remains available when the operator guide is not needed:
+
+```bash
+conda run -n rl-infra-design-agents make prepare-humanize-task \
+  CONTRACT=examples/task_contracts/training-rollout-mismatch-debug.yaml \
+  HUMANIZE_WORKSPACE=/tmp/rlinfra-humanize-task-workspace \
+  TARGET_REPO=/path/to/target/repo \
+  DIFF_BASE=main
+```
 
 Manual sequence:
 

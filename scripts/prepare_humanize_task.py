@@ -19,6 +19,7 @@ CONTEXT_FILES = {
     "sources": "context/context_sources.yaml",
 }
 BRIDGE_SCHEMA_VERSION = 1
+BRIDGE_METADATA_RELPATH = Path(".humanize") / "rlinfra_bridge.json"
 MAX_COMMAND_OUTPUT_CHARS = 4096
 STRICT_PREREQ_EXIT_CODE = 2
 
@@ -422,7 +423,7 @@ def prepare(args: argparse.Namespace) -> int:
     for warning in prereqs["warnings"]:
         print(f"WARN: {warning}")
 
-    metadata_path = (workspace / ".humanize" / "rlinfra_bridge.json").resolve()
+    metadata_path = (workspace / BRIDGE_METADATA_RELPATH).resolve()
     humanize_start_path = (workspace / "humanize_start.md").resolve()
     humanize_start = render_humanize_start(
         prepared_at=prepared_at,

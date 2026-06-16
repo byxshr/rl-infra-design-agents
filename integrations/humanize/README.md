@@ -10,14 +10,15 @@ Suggested commands in Claude Code:
 /humanize:start-rlcr-loop docs/plan.md
 ```
 
-Preferred bridge from this repository:
+Preferred start wrapper from this repository:
 
 ```bash
-make prepare-humanize-task \
+make start-humanize-task \
   CONTRACT=examples/task_contracts/training-rollout-mismatch-debug.yaml \
   HUMANIZE_WORKSPACE=/tmp/rlinfra-humanize-task-workspace \
   TARGET_REPO=/path/to/target/repo \
-  DIFF_BASE=main
+  DIFF_BASE=main \
+  ROUND=1
 ```
 
 Then open Claude Code in `/tmp/rlinfra-humanize-task-workspace` and run:
@@ -26,7 +27,7 @@ Then open Claude Code in `/tmp/rlinfra-humanize-task-workspace` and run:
 /humanize:start-rlcr-loop docs/plan.md
 ```
 
-The bridge prepares the workspace only; it does not start Claude Code. Preserve `context/context_bundle.md`, `context/context_bundle.json`, `context/context_sources.yaml`, RLInfraWiki page/source IDs, non-claims, validation evidence, and risk updates through the Humanize loop. Use `.humanize/rlinfra_bridge.json` to recover the bridge schema version, main-repo commit, pinned `RLInfraWiki` commit, target repo/diff-base validation status, and command provenance for round import.
+The wrapper prepares the workspace only; it does not start Claude Code. It writes `humanize_operator.md` and `.humanize/rlinfra_operator.json` with the exact start/import/gate commands. Preserve `context/context_bundle.md`, `context/context_bundle.json`, `context/context_sources.yaml`, RLInfraWiki page/source IDs, non-claims, validation evidence, and risk updates through the Humanize loop. Use `.humanize/rlinfra_bridge.json` to recover the bridge schema version, main-repo commit, pinned `RLInfraWiki` commit, target repo/diff-base validation status, and command provenance for round import.
 
 After Humanize writes `.humanize/rlcr/<timestamp>/round-N-summary.md` and `round-N-review-result.md`, import the round:
 
@@ -44,7 +45,7 @@ python .agents/skills/RLInfraWiki/scripts/validate_review_gate.py \
   --require-review
 ```
 
-IMP-015 remains the boundary for a stricter one-command start wrapper.
+IMP-016 remains the boundary for deciding whether to wrap more of the interactive Humanize execution.
 
 Repository-compatible commands:
 

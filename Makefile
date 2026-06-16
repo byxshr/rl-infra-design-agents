@@ -1,4 +1,4 @@
-.PHONY: setup validate test status indices validate-ledger validate-source-refs validate-source-drift validate-golden-paths check prepare-humanize-task import-humanize-round render-example review-gate demo render-slime-grpo-contract review-slime-grpo-contract demo-slime-grpo-contract render-rollout-backend-selection review-rollout-backend-selection demo-rollout-backend-selection render-training-rollout-mismatch-debug review-training-rollout-mismatch-debug demo-training-rollout-mismatch-debug
+.PHONY: setup validate test status indices validate-ledger validate-source-refs validate-source-drift validate-golden-paths check prepare-humanize-task start-humanize-task import-humanize-round render-example review-gate demo render-slime-grpo-contract review-slime-grpo-contract demo-slime-grpo-contract render-rollout-backend-selection review-rollout-backend-selection demo-rollout-backend-selection render-training-rollout-mismatch-debug review-training-rollout-mismatch-debug demo-training-rollout-mismatch-debug
 
 WORKSPACE ?= /tmp/rl-infra-task-workspace
 GRPO_WORKSPACE ?= /tmp/slime-grpo-rlvr-data-contract-workspace
@@ -53,6 +53,16 @@ prepare-humanize-task:
 	  --workspace "$(HUMANIZE_WORKSPACE)" \
 	  $(if $(TARGET_REPO),--target-repo "$(TARGET_REPO)",) \
 	  --diff-base "$(DIFF_BASE)" \
+	  --force \
+	  --overwrite-human-docs
+
+start-humanize-task:
+	$(PYTHON) scripts/start_humanize_task.py \
+	  --contract "$(CONTRACT)" \
+	  --workspace "$(HUMANIZE_WORKSPACE)" \
+	  $(if $(TARGET_REPO),--target-repo "$(TARGET_REPO)",) \
+	  --diff-base "$(DIFF_BASE)" \
+	  --round "$(ROUND)" \
 	  --force \
 	  --overwrite-human-docs
 
