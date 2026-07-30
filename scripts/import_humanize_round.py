@@ -22,7 +22,7 @@ NO_FINDING_RE = re.compile(
     r"(^|\b)(COMPLETE|no\s+(?:open\s+)?(?:issues|findings|problems)|no\s+\[P[0-9]\]\s+issues|no\s+blocking\s+issues)(\b|$)",
     re.IGNORECASE | re.MULTILINE,
 )
-SUPPORTED_BRIDGE_SCHEMA_VERSIONS = frozenset({1})
+SUPPORTED_BRIDGE_SCHEMA_VERSIONS = frozenset({1, 2})
 
 
 class ImportErrorWithMessage(Exception):
@@ -134,14 +134,7 @@ def candidate_loop_dirs(base: Path) -> list[Path]:
     return candidates
 
 
-def discover_loop_dir(workspace: Path, explicit: str | None) -> Path:
-    if explicit:
-        loop_dir = resolve_cli_path(explicit, base=Path.cwd())
-        if not loop_dir.exists() or not loop_dir.is_dir():
-            raise ImportErrorWithMessage(f"humanize loop dir does not exist or is not a directory: {loop_dir}")
-        return loop_dir
-
-    base = workspace / ".humanize" / "rlcr"
+def discover_under_base(base: Path, *, strict_ambiguity: bool) -> Path | None:
     actives = active_loop_dirs(base)
     if len(actives) == 1:
         return actives[0].resolve()
@@ -151,13 +144,41 @@ def discover_loop_dir(workspace: Path, explicit: str | None) -> Path:
 
     candidates = candidate_loop_dirs(base)
     if not candidates:
-        raise ImportErrorWithMessage(f"no Humanize loop dirs found under {base}")
+        return None
     if len(candidates) == 1:
         return candidates[0].resolve()
-    if all(TIMESTAMP_DIR_RE.match(path.name) for path in candidates):
+    if not strict_ambiguity and all(TIMESTAMP_DIR_RE.match(path.name) for path in candidates):
         return sorted(candidates, key=lambda path: path.name)[-1].resolve()
     listed = "\n".join(f"- {path}" for path in candidates)
     raise ImportErrorWithMessage(f"multiple Humanize loop dirs found and latest is ambiguous; pass --humanize-loop-dir:\n{listed}")
+
+
+def discover_loop_dir(workspace: Path, explicit: str | None, bridge: dict[str, Any]) -> Path:
+    if explicit:
+        loop_dir = resolve_cli_path(explicit, base=Path.cwd())
+        if not loop_dir.exists() or not loop_dir.is_dir():
+            raise ImportErrorWithMessage(f"humanize loop dir does not exist or is not a directory: {loop_dir}")
+        return loop_dir
+
+    if bridge.get("schema_version") == 2 and bridge.get("execution_mode") == "target_repo":
+        target_repo = bridge.get("target_repo")
+        if not isinstance(target_repo, str) or not target_repo.strip():
+            raise ImportErrorWithMessage("v2 target-repo bridge metadata is missing target_repo")
+        target_base = Path(target_repo).expanduser().resolve() / ".humanize" / "rlcr"
+        discovered = discover_under_base(target_base, strict_ambiguity=True)
+        if discovered is not None:
+            return discovered
+        raise ImportErrorWithMessage(
+            "no Humanize loop dirs found under the v2 target repository; "
+            f"expected a loop under {target_base}. "
+            "Pass --humanize-loop-dir only for a deliberate explicit import."
+        )
+
+    workspace_base = workspace / ".humanize" / "rlcr"
+    discovered = discover_under_base(workspace_base, strict_ambiguity=False)
+    if discovered is not None:
+        return discovered
+    raise ImportErrorWithMessage(f"no Humanize loop dirs found under {workspace_base}")
 
 
 def discover_round(loop_dir: Path, requested: int | None) -> int:
@@ -311,7 +332,7 @@ def import_round(args: argparse.Namespace) -> int:
     bridge_path = workspace / ".humanize" / "rlinfra_bridge.json"
     bridge = load_json(bridge_path)
     bridge_warnings = validate_bridge(bridge, workspace, set(args.accept_bridge_schema))
-    loop_dir = discover_loop_dir(workspace, args.humanize_loop_dir)
+    loop_dir = discover_loop_dir(workspace, args.humanize_loop_dir, bridge)
     round_number = discover_round(loop_dir, args.round)
     summary_path, review_path = required_round_files(loop_dir, round_number)
     review_text = review_path.read_text(encoding="utf-8", errors="replace")

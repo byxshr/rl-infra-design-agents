@@ -1,6 +1,6 @@
 # Current Project Status
 
-Last reviewed: 2026-06-15
+Last reviewed: 2026-07-21
 
 ## Purpose
 
@@ -60,7 +60,8 @@ Last validated commands:
 | command | result |
 |---|---|
 | `git submodule update --init --recursive` | Passed in the authoring workspace. The standalone remote now exists at `https://github.com/byxshr/RLInfraWiki`; a fresh remote clone should resolve `.gitmodules` URL `../RLInfraWiki` to the sibling GitHub repository after the main repo commit is pushed. |
-| `conda run -n rl-infra-design-agents make check` | Passed: generated query indices current, RLInfraWiki validation passed, strict SourcePack hash validation passed, content ledger validation passed, golden path snapshot tests passed, `84 passed`. |
+| `conda run -n rl-infra-design-agents make check` | Passed: generated query indices current, RLInfraWiki validation passed, strict SourcePack hash validation passed, content ledger validation passed, golden path snapshot tests passed, `145 passed`. |
+| Humanize-focused tests in the four root test modules | Passed: `61 tests`; includes prepare/start default-preservation behavior, refined-plan preservation, synthetic git target hygiene, plan-lock validation, schema-stable dirty-tree reporting with raw space/Unicode paths, remediation-failure report safety, bridge/operator schema v2, v1 import compatibility, target-only loop discovery, strict non-active ambiguity, and fake Claude launcher cwd/argument smoke with a target path containing spaces. |
 | `python scripts/validate_content_ledger.py` | Passed: `docs/rlinfrawiki-content-status.md` matches the pinned `RLInfraWiki` page IDs, paths, status enums, themes, source IDs, and review-ready structure checks. |
 | `conda run -n rl-infra-design-agents make validate-golden-paths` | Passed: `8 passed`; four golden paths render into temporary workspaces, pass review gate, keep context sidecars, retain key semantic anchors, and enforce runtime-claim guard behavior. |
 | `conda run -n rl-infra-design-agents make demo` | Passed: check, render, review gate, P0 query; printed workspace/context paths. |
@@ -79,7 +80,7 @@ Last validated commands:
 | `python scripts/compose_context.py ... && python scripts/validate_context_bundle.py ...` in standalone `RLInfraWiki/` | Passed. |
 | `python .agents/skills/RLInfraWiki/scripts/query.py 'async agentic RL Ray orchestration tool calling multi-turn rollout stale policy' --limit 10` | Passed: returned agentic tool-calling, Ray multi-role, OpenAI-compatible agent app, multi-turn environment, orchestration options, async rollout, AReaL, and ROLL pages in the top 10. |
 | `python .agents/skills/RLInfraWiki/scripts/compare_frameworks.py areal roll --capability async-rollout` | Passed: both AReaL and ROLL report `source-reported` async rollout evidence from SourcePack-backed sources. |
-| `conda run -n rl-infra-design-agents python -m pytest -q` via the main repo plus pinned `RLInfraWiki` dependency | Passed through `make check`: `84 passed`. Bare base `pytest` previously exited 139 in this environment, so conda env is the validated test runner. |
+| `conda run -n rl-infra-design-agents python -m pytest -q` via the main repo plus pinned `RLInfraWiki` dependency | Passed through `make check`: `145 passed`. Bare base `pytest` previously exited 139 in this environment, so conda env is the validated test runner. |
 
 ## Completed Progress
 
@@ -186,12 +187,23 @@ Two maintenance ledgers now exist:
 - `docs/rlinfrawiki-content-status.md`: page-level Wiki maturity and evidence gaps.
 - `docs/project-improvement-status.md`: project-level runnable workflow and usability improvements.
 
+### Humanize Target Hygiene
+
+IMP-018 upgrades real target-repository startup from a workspace hint to a checked two-stage flow:
+
+- `prepare-humanize-task` renders a staging workspace; the generated target-mode guide no longer tells operators to launch Claude Code from `/tmp`.
+- The target plan must be copied to a normal repository path, committed, clean, and byte-identical to the staged `docs/plan.md`.
+- `preflight_humanize_target.py` rejects unsafe plan paths, stale plan locks, unresolved local base branches, dirty targets, bridge metadata mismatch, and tracked or staged `.humanize/` state. Both prepare and start preserve human docs by default. When needed, preflight adds anchored `/.humanize/` to local `.git/info/exclude` before later plan/tree checks, so that local-only write can remain even when a subsequent check fails; it does not edit tracked `.gitignore` or target source files.
+- `start-humanize-task` preserves refined human docs by default and returns exit code `3` for target hygiene failures. On success it writes `launch_humanize.sh`, which repeats preflight, starts Claude Code with the target repository as its session root, and forwards CLI arguments.
+- Bridge/operator metadata use schema v2. Round import remains compatible with schema v1; v2 target mode searches only the target repository automatically and requires an explicit path for any cross-root import.
+
 ## Current Limitations
 
 - The project is runnable as a design workflow, but it has not run real distributed RL training.
 - P0 content is source-backed through local code/docs/source refs, but no GPU or multi-node NCCL smoke run has been executed.
 - No real distributed training, SGLang/Megatron runtime integration, NCCL group update, or performance benchmark has been locally verified.
 - P1 framework/content tracks are still mostly source summaries or dictionary-level contracts, not runtime-validated implementations.
+- The IMP-018 launcher was verified with a synthetic git target and fake Claude executable. A real Claude Code/Humanize Stop-hook round has not yet been rerun with this implementation.
 - Bare base-environment `pytest` exited with code 139; `conda run -n rl-infra-design-agents pytest -q` is the validated test runner.
 
 ## Recommended Next Work
@@ -201,7 +213,9 @@ Use `docs/project-improvement-status.md` as the source of truth for detailed ite
 1. Keep standalone `RLInfraWiki/` validation and main repo `make demo` green when changing the submodule.
 2. Watch GitHub Actions after each push; fix submodule, dependency, or review-gate drift before expanding content.
 3. Keep all four golden paths green in CI after each submodule pointer update.
-4. Promote the remaining P1 Wiki tracks from `docs/rlinfrawiki-content-status.md`, starting with training backend comparison and then review-ready hardening for async agentic RL/Ray orchestration.
+4. Implement IMP-020 gate-aware Codex review prompts, then IMP-021 external-validation handoff, before the next real Humanize pilot.
+5. Rerun a real target-repository Humanize loop through the generated launcher and retain the preflight, Stop-hook, and review artifacts as pilot evidence.
+6. Promote the remaining P1 Wiki tracks from `docs/rlinfrawiki-content-status.md`, starting with training backend comparison and then review-ready hardening for async agentic RL/Ray orchestration.
 
 ## Developer Notes
 

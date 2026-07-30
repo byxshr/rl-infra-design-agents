@@ -100,13 +100,111 @@ def test_complete_round_import_creates_artifacts_and_gate_passes(tmp_path, prepa
     assert metadata["round"] == 1
     assert metadata["no_finding"] is True
     assert metadata["issue_count"] == 0
-    assert metadata["bridge"]["schema_version"] == 1
+    assert metadata["bridge"]["schema_version"] == 2
     assert metadata["warnings"] == []
     assert set(metadata["source_files"]) >= {"summary", "review_result", "prompt", "review_prompt", "goal_tracker"}
     assert "No parser-compatible P0-P3 findings" in (round_dir / "codex_review.md").read_text(encoding="utf-8")
 
     gate = run_gate(workspace)
     assert gate.returncode == 0, gate.stdout + gate.stderr
+
+
+def test_v1_bridge_remains_importable(tmp_path, prepared_workspace_template):
+    workspace = copy_workspace(prepared_workspace_template, tmp_path)
+    bridge_path = workspace / ".humanize" / "rlinfra_bridge.json"
+    bridge = json.loads(bridge_path.read_text(encoding="utf-8"))
+    bridge["schema_version"] = 1
+    bridge.pop("execution_mode", None)
+    bridge_path.write_text(json.dumps(bridge, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    loop_dir = write_humanize_round(workspace, review_text="COMPLETE\n")
+
+    result = run_import(workspace, "--humanize-loop-dir", str(loop_dir), "--round", "1")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    metadata = json.loads(
+        (workspace / "review_rounds" / "round-001" / "humanize_round_metadata.json").read_text(encoding="utf-8")
+    )
+    assert metadata["bridge"]["schema_version"] == 1
+
+
+def test_v2_target_bridge_auto_discovers_target_repo_loop(tmp_path, prepared_workspace_template):
+    workspace = copy_workspace(prepared_workspace_template, tmp_path)
+    target = tmp_path / "target"
+    target.mkdir()
+    bridge_path = workspace / ".humanize" / "rlinfra_bridge.json"
+    bridge = json.loads(bridge_path.read_text(encoding="utf-8"))
+    bridge.update({"schema_version": 2, "execution_mode": "target_repo", "target_repo": str(target.resolve())})
+    bridge_path.write_text(json.dumps(bridge, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    loop_dir = write_humanize_round(target, review_text="COMPLETE\n")
+
+    result = run_import(workspace, "--round", "1")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    metadata = json.loads(
+        (workspace / "review_rounds" / "round-001" / "humanize_round_metadata.json").read_text(encoding="utf-8")
+    )
+    assert metadata["loop_dir"] == str(loop_dir.resolve())
+
+
+def test_v2_target_bridge_does_not_fallback_to_workspace_loop(tmp_path, prepared_workspace_template):
+    workspace = copy_workspace(prepared_workspace_template, tmp_path)
+    target = tmp_path / "target"
+    target.mkdir()
+    bridge_path = workspace / ".humanize" / "rlinfra_bridge.json"
+    bridge = json.loads(bridge_path.read_text(encoding="utf-8"))
+    bridge.update({"schema_version": 2, "execution_mode": "target_repo", "target_repo": str(target.resolve())})
+    bridge_path.write_text(json.dumps(bridge, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    stale_loop = write_humanize_round(workspace, review_text="COMPLETE\n")
+
+    result = run_import(workspace, "--round", "1")
+
+    assert result.returncode == 1
+    assert str(target / ".humanize" / "rlcr") in result.stderr
+    assert "deliberate explicit import" in result.stderr
+    assert not (workspace / "review_rounds" / "round-001").exists()
+
+    explicit = run_import(workspace, "--humanize-loop-dir", str(stale_loop), "--round", "1")
+    assert explicit.returncode == 0, explicit.stdout + explicit.stderr
+
+
+def test_v2_target_bridge_rejects_multiple_target_loops(tmp_path, prepared_workspace_template):
+    workspace = copy_workspace(prepared_workspace_template, tmp_path)
+    target = tmp_path / "target"
+    target.mkdir()
+    bridge_path = workspace / ".humanize" / "rlinfra_bridge.json"
+    bridge = json.loads(bridge_path.read_text(encoding="utf-8"))
+    bridge.update({"schema_version": 2, "execution_mode": "target_repo", "target_repo": str(target.resolve())})
+    bridge_path.write_text(json.dumps(bridge, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_humanize_round(target, loop_name="2026-06-15_12-00-00", review_text="COMPLETE\n")
+    write_humanize_round(target, loop_name="2026-06-15_12-00-01", review_text="COMPLETE\n")
+
+    result = run_import(workspace, "--round", "1")
+
+    assert result.returncode == 1
+    assert "multiple active Humanize loop dirs found" in result.stderr
+    assert "--humanize-loop-dir" in result.stderr
+
+
+def test_v2_target_bridge_rejects_multiple_non_active_timestamp_loops(tmp_path, prepared_workspace_template):
+    workspace = copy_workspace(prepared_workspace_template, tmp_path)
+    target = tmp_path / "target"
+    target.mkdir()
+    bridge_path = workspace / ".humanize" / "rlinfra_bridge.json"
+    bridge = json.loads(bridge_path.read_text(encoding="utf-8"))
+    bridge.update({"schema_version": 2, "execution_mode": "target_repo", "target_repo": str(target.resolve())})
+    bridge_path.write_text(json.dumps(bridge, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    first = write_humanize_round(target, loop_name="2026-06-15_12-00-00")
+    second = write_humanize_round(target, loop_name="2026-06-15_12-00-01")
+    for loop_dir in [first, second]:
+        (loop_dir / "state.md").unlink()
+        (loop_dir / "goal-tracker.md").unlink()
+
+    result = run_import(workspace, "--round", "1")
+
+    assert result.returncode == 1
+    assert "multiple Humanize loop dirs found and latest is ambiguous" in result.stderr
+    assert first.name in result.stderr
+    assert second.name in result.stderr
 
 
 def test_no_finding_review_accepts_bracket_priority_phrase(tmp_path, prepared_workspace_template):
@@ -220,14 +318,14 @@ def test_unsupported_bridge_schema_fails_unless_explicitly_accepted(tmp_path, pr
     workspace = copy_workspace(prepared_workspace_template, tmp_path)
     bridge_path = workspace / ".humanize" / "rlinfra_bridge.json"
     bridge = json.loads(bridge_path.read_text(encoding="utf-8"))
-    bridge["schema_version"] = 2
+    bridge["schema_version"] = 99
     bridge_path.write_text(json.dumps(bridge, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     loop_dir = write_humanize_round(workspace, review_text="COMPLETE\n")
 
     result = run_import(workspace, "--humanize-loop-dir", str(loop_dir), "--round", "1")
 
     assert result.returncode != 0
-    assert "unsupported bridge schema_version: 2" in result.stderr
+    assert "unsupported bridge schema_version: 99" in result.stderr
 
     accepted = run_import(
         workspace,
@@ -236,7 +334,7 @@ def test_unsupported_bridge_schema_fails_unless_explicitly_accepted(tmp_path, pr
         "--round",
         "1",
         "--accept-bridge-schema",
-        "2",
+        "99",
     )
     assert accepted.returncode == 0, accepted.stdout + accepted.stderr
 

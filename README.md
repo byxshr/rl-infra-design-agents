@@ -76,25 +76,73 @@ Expected result: `/tmp/training-rollout-mismatch-debug-workspace` is rendered an
 
 ## Humanize-ready task
 
-Use the start wrapper as the recommended entry for a real RL infra task contract:
+Real code-changing tasks use a two-stage flow. First render the staging workspace:
+
+```bash
+conda run -n rl-infra-design-agents make prepare-humanize-task \
+  CONTRACT=examples/task_contracts/training-rollout-mismatch-debug.yaml \
+  HUMANIZE_WORKSPACE=/tmp/rlinfra-humanize-task-workspace \
+  TARGET_REPO=/path/to/target/repo \
+  DIFF_BASE=main
+```
+
+Both `prepare-humanize-task` and `start-humanize-task` preserve existing human docs by default. Set `HUMANIZE_OVERWRITE_DOCS=1` only for an intentional scaffold reset.
+
+Copy the generated plan into a normal target-repository path and commit it:
+
+```bash
+cd /path/to/target/repo
+mkdir -p docs/superpowers/rlcr
+cp /tmp/rlinfra-humanize-task-workspace/docs/plan.md docs/superpowers/rlcr/<task-name>-plan.md
+git add docs/superpowers/rlcr/<task-name>-plan.md
+git commit -m "Add RLCR plan for <task-name>"
+```
+
+Then run the strict start wrapper from the main repository:
 
 ```bash
 conda run -n rl-infra-design-agents make start-humanize-task \
   CONTRACT=examples/task_contracts/training-rollout-mismatch-debug.yaml \
   HUMANIZE_WORKSPACE=/tmp/rlinfra-humanize-task-workspace \
   TARGET_REPO=/path/to/target/repo \
+  TARGET_PLAN=docs/superpowers/rlcr/<task-name>-plan.md \
   DIFF_BASE=main \
   ROUND=1
 ```
 
-This command runs the IMP-013 preparation flow, then prints and records the operator steps needed to start Humanize in Claude Code, import the produced round, and run the review gate. It writes:
+The wrapper rerenders generated context while preserving existing human docs, refreshes the plan lock, and validates the workspace. It requires the target plan to be tracked, clean, and byte-identical to both `docs/plan.md` and its plan-lock hash; rejects tracked `.humanize/` state and any other dirty target files; and ensures the root `/.humanize/` path is covered by the target repository's local `.git/info/exclude`. After an intentional scaffold reset, review and recommit the synchronized target plan. It writes:
 
 - `/tmp/rlinfra-humanize-task-workspace/humanize_operator.md`
 - `/tmp/rlinfra-humanize-task-workspace/humanize_start.md`
+- `/tmp/rlinfra-humanize-task-workspace/launch_humanize.sh`
 - `/tmp/rlinfra-humanize-task-workspace/.humanize/rlinfra_operator.json`
 - `/tmp/rlinfra-humanize-task-workspace/.humanize/rlinfra_bridge.json`
+- `/tmp/rlinfra-humanize-task-workspace/.humanize/rlinfra_target_preflight.json`
 
-The wrapper does not automatically start Claude Code or run the Humanize plugin. It prepares the workspace and prints the next commands. Open Claude Code in the prepared workspace, then run:
+The wrapper does not automatically start Claude Code or run Humanize. Run the generated launcher; it repeats the strict preflight, starts Claude Code with the target repository as the session root, and forwards optional Claude CLI arguments:
+
+```bash
+/tmp/rlinfra-humanize-task-workspace/launch_humanize.sh
+```
+
+The launcher is intended for the initial clean-tree launch. After the loop has intentionally modified the target tree, resume the existing Claude session or start Claude directly from the target root rather than rerunning the strict launcher.
+
+Then run the exact slash command printed in `humanize_operator.md`:
+
+```text
+/humanize:start-rlcr-loop docs/superpowers/rlcr/<task-name>-plan.md --track-plan-file --base-branch main
+```
+
+Before using the slash command, make sure the Humanize Claude Code plugin is installed. A local `humanize/` checkout is not enough by itself; Claude Code must register the plugin commands. In Claude Code, install it once with:
+
+```text
+/plugin marketplace add PolyArch/humanize
+/plugin install humanize@PolyArch
+```
+
+If `/humanize:start-rlcr-loop` reports an unknown command, install or update the plugin, restart Claude Code, and rerun the command. The command prefix is `/humanize` without the extra `n`.
+
+For design-only tasks that do not edit a separate target repository, open Claude Code in the prepared workspace:
 
 ```bash
 cd /tmp/rlinfra-humanize-task-workspace
@@ -104,6 +152,8 @@ cd /tmp/rlinfra-humanize-task-workspace
 /humanize:start-rlcr-loop docs/plan.md
 ```
 
+Do not start a real target-repo loop from `/tmp/rlinfra-humanize-task-workspace` and then switch repositories inside a Bash command. Humanize Stop hooks use the Claude Code session root. Keep `.humanize/rlcr/` local-only; do not commit round summaries, state files, contracts, or goal trackers, and never use `git add -f .humanize`. Tracked plans must live outside `.humanize/`.
+
 After Humanize writes `.humanize/rlcr/<timestamp>/round-N-summary.md` and `round-N-review-result.md`, import the round back into this workspace's RLCR ledger:
 
 ```bash
@@ -112,7 +162,7 @@ conda run -n rl-infra-design-agents make import-humanize-round \
   ROUND=1
 ```
 
-If more than one loop directory exists, add `HUMANIZE_LOOP_DIR=/tmp/rlinfra-humanize-task-workspace/.humanize/rlcr/<timestamp>`.
+Bridge schema v2 searches only the target repository's `.humanize/rlcr/` during automatic discovery. It never falls back to a staging-workspace round. If more than one target loop exists, add `HUMANIZE_LOOP_DIR=/path/to/target/repo/.humanize/rlcr/<timestamp>`; an explicit loop path is also required for any deliberate exceptional import outside the target.
 
 Then require a Codex review artifact in the local gate:
 
@@ -124,7 +174,7 @@ conda run -n rl-infra-design-agents python .agents/skills/RLInfraWiki/scripts/va
 
 The importer validates the bridge schema, copies the Humanize summary/review into `review_rounds/round-001/`, normalizes `[P0]` to `[P3]` findings into parser-compatible headings, preserves the raw Humanize review output, writes `humanize_round_metadata.json` with file hashes, bridge provenance, stale-workspace warnings, and UTF-8 replacement markers, and updates `review_issues.jsonl`. COMPLETE/no-finding rounds satisfy `--require-review`; open P0/P1/P2 findings still block promotion through the existing review gate.
 
-The operator metadata mirrors the bridge metadata path and records schema version, contract, workspace, target repo, diff base, round, prerequisite warnings, and the exact prepare/start/import/gate commands. If Humanize or the `codex` CLI is unavailable, preparation still succeeds by default and records prerequisite warnings in `.humanize/rlinfra_bridge.json` and `.humanize/rlinfra_operator.json`. Add `--strict-prereqs` when missing local Humanize/Codex prerequisites should fail the wrapper with the same exit code as `prepare_humanize_task.py`.
+The operator metadata records schema version, execution mode, target plan/hash, preflight and ignore provenance, launcher, contract, workspace, target repo, diff base, round, prerequisite warnings, and exact prepare/start/import/gate commands. Target hygiene failures return exit code `3`, retain the preflight report, and do not leave stale operator or launcher artifacts. Add `--strict-prereqs` when missing local Humanize/Codex prerequisites should preserve prepare's exit code `2`.
 
 The lower-level preparation entry remains available when the operator guide is not needed:
 

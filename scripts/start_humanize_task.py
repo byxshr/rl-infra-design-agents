@@ -13,9 +13,11 @@ from typing import Any
 from prepare_humanize_task import BRIDGE_METADATA_RELPATH, BRIDGE_SCHEMA_VERSION as PREPARE_BRIDGE_SCHEMA_VERSION
 
 
-OPERATOR_SCHEMA_VERSION = 1
+OPERATOR_SCHEMA_VERSION = 2
 SUPPORTED_PREPARE_BRIDGE_SCHEMA_VERSIONS = frozenset({PREPARE_BRIDGE_SCHEMA_VERSION})
 SLASH_COMMAND = "/humanize:start-rlcr-loop docs/plan.md"
+TARGET_PREFLIGHT_RELPATH = Path(".humanize") / "rlinfra_target_preflight.json"
+TARGET_HYGIENE_EXIT_CODE = 3
 
 
 class StartError(Exception):
@@ -129,7 +131,62 @@ def run_prepare(argv: list[str], *, root: Path, print_json: bool, timeout: int) 
     return result
 
 
-def build_commands(*, root: Path, workspace: Path, round_number: int, python_executable: str) -> dict[str, Any]:
+def run_target_preflight(
+    *,
+    root: Path,
+    workspace: Path,
+    target_repo: Path,
+    target_plan: str,
+    diff_base: str,
+    timeout: int,
+) -> tuple[subprocess.CompletedProcess[str], dict[str, Any] | None, list[str]]:
+    report_path = (workspace / TARGET_PREFLIGHT_RELPATH).resolve()
+    argv = [
+        sys.executable,
+        str(root / "scripts" / "preflight_humanize_target.py"),
+        "--target-repo",
+        str(target_repo),
+        "--workspace",
+        str(workspace),
+        "--target-plan",
+        target_plan,
+        "--diff-base",
+        diff_base,
+        "--report",
+        str(report_path),
+        "--print-json",
+    ]
+    try:
+        result = subprocess.run(argv, cwd=root, text=True, capture_output=True, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        result = subprocess.CompletedProcess(
+            argv,
+            124,
+            stdout=normalize_stream(exc.stdout),
+            stderr=normalize_stream(exc.stderr) + f"\nTarget preflight timed out after {timeout} seconds.\n",
+        )
+    report = None
+    if result.stdout.strip():
+        try:
+            parsed = json.loads(result.stdout)
+            if isinstance(parsed, dict):
+                report = parsed
+        except json.JSONDecodeError:
+            pass
+    return result, report, argv
+
+
+def build_commands(
+    *,
+    root: Path,
+    workspace: Path,
+    round_number: int,
+    python_executable: str,
+    target_repo: Path | None,
+    target_plan: str | None,
+    diff_base: str,
+    launcher_path: Path | None,
+) -> dict[str, Any]:
     import_command = " ".join(
         [
             "make",
@@ -139,13 +196,14 @@ def build_commands(*, root: Path, workspace: Path, round_number: int, python_exe
             make_var("PYTHON", python_executable),
         ]
     )
+    loop_root = (target_repo or workspace) / ".humanize" / "rlcr" / "{{TIMESTAMP}}"
     import_with_loop_dir = " ".join(
         [
             "make",
             "import-humanize-round",
             make_var("HUMANIZE_WORKSPACE", str(workspace)),
             make_var("ROUND", round_number),
-            make_var("HUMANIZE_LOOP_DIR", str(workspace / ".humanize" / "rlcr" / "{{TIMESTAMP}}")),
+            make_var("HUMANIZE_LOOP_DIR", str(loop_root)),
             make_var("PYTHON", python_executable),
         ]
     )
@@ -156,14 +214,54 @@ def build_commands(*, root: Path, workspace: Path, round_number: int, python_exe
         str(workspace),
         "--require-review",
     ]
+    humanize_start = SLASH_COMMAND
+    if target_repo is not None and target_plan is not None:
+        humanize_start = (
+            f"/humanize:start-rlcr-loop {target_plan} --track-plan-file --base-branch {diff_base}"
+        )
     return {
         "enter_workspace": f"cd {shlex.quote(str(workspace))}",
-        "humanize_start": SLASH_COMMAND,
+        "launch_claude": shell_join([str(launcher_path)]) if launcher_path is not None else None,
+        "humanize_start": humanize_start,
         "import_round": import_command,
         "import_round_with_loop_dir": import_with_loop_dir,
         "review_gate": shell_join(gate_argv),
         "python": python_executable,
     }
+
+
+def render_launcher(
+    *,
+    root: Path,
+    workspace: Path,
+    target_repo: Path,
+    target_plan: str,
+    diff_base: str,
+    report_path: Path,
+) -> str:
+    preflight = shell_join(
+        [
+            sys.executable,
+            str(root / "scripts" / "preflight_humanize_target.py"),
+            "--target-repo",
+            str(target_repo),
+            "--workspace",
+            str(workspace),
+            "--target-plan",
+            target_plan,
+            "--diff-base",
+            diff_base,
+            "--report",
+            str(report_path),
+        ]
+    )
+    return f"""#!/usr/bin/env bash
+set -euo pipefail
+
+{preflight}
+cd {shlex.quote(str(target_repo))}
+exec "${{RLINFRA_CLAUDE_BIN:-claude}}" "$@"
+"""
 
 
 def render_operator_doc(
@@ -172,31 +270,42 @@ def render_operator_doc(
     contract: Path,
     workspace: Path,
     target_repo: Path | None,
+    target_plan: str | None,
     diff_base: str,
     round_number: int,
     bridge_metadata_path: Path,
     operator_metadata_path: Path,
+    launcher_path: Path | None,
+    preflight_report_path: Path | None,
     commands: dict[str, Any],
 ) -> str:
     target_text = str(target_repo) if target_repo is not None else "not provided"
-    return f"""<!-- generated by scripts/start_humanize_task.py at {created_at}; metadata: {operator_metadata_path} -->
+    target_plan_text = target_plan or "not provided"
+    if target_repo is not None:
+        start_instructions = f"""## 1. Launch Claude Code From The Target Repository
 
-# Humanize Task Operator Guide
+The target plan passed strict hygiene checks and matches the prepared `docs/plan.md` byte-for-byte.
 
-This workspace was prepared by the IMP-015 start wrapper. It does not start Claude Code and does not run the Humanize plugin.
+Run the generated launcher from a terminal:
 
-## Prepared Inputs
+```bash
+{commands["launch_claude"]}
+```
 
-- Contract: `{contract}`
-- Workspace: `{workspace}`
-- Target repo: `{target_text}`
-- Diff base: `{diff_base}`
-- Round to import: `{round_number}`
-- Bridge metadata: `{bridge_metadata_path}`
-- Operator metadata: `{operator_metadata_path}`
-- Plan: `docs/plan.md`
+The launcher reruns target preflight, changes directory to `{target_repo}`, and starts Claude Code there. Do not start Claude Code from the staging workspace and switch repositories later.
 
-## 1. Start Humanize In Claude Code
+The launcher is an initial-launch guard and forwards any Claude CLI arguments. Once a loop has intentionally changed the target working tree, resume inside the existing Claude session or start Claude directly from the target root; the strict launcher will reject the in-flight dirty tree.
+
+Then run this exact slash command inside Claude Code:
+
+```text
+{commands["humanize_start"]}
+```
+
+The tracked plan lives outside `.humanize/`. Keep `.humanize/rlcr/` local-only and never run `git add -f .humanize`.
+"""
+    else:
+        start_instructions = f"""## 1. Start Humanize In Claude Code
 
 Open Claude Code in the prepared workspace:
 
@@ -209,6 +318,43 @@ Run this exact slash command inside Claude Code:
 ```text
 {commands["humanize_start"]}
 ```
+
+Workspace-only mode does not provide target-repository session-root guarantees. Use target mode for real code-changing tasks.
+"""
+    return f"""<!-- generated by scripts/start_humanize_task.py at {created_at}; metadata: {operator_metadata_path} -->
+
+# Humanize Task Operator Guide
+
+This workspace was prepared by the IMP-015 start wrapper. It does not start Claude Code and does not run the Humanize plugin.
+
+## Prepared Inputs
+
+- Contract: `{contract}`
+- Workspace: `{workspace}`
+- Target repo: `{target_text}`
+- Target plan: `{target_plan_text}`
+- Diff base: `{diff_base}`
+- Round to import: `{round_number}`
+- Bridge metadata: `{bridge_metadata_path}`
+- Operator metadata: `{operator_metadata_path}`
+- Target preflight report: `{preflight_report_path or 'not applicable'}`
+- Claude launcher: `{launcher_path or 'not applicable'}`
+- Plan: `docs/plan.md`
+
+## Humanize Plugin Prerequisites
+
+This guide does not prove the Humanize Claude Code plugin is installed. A local `humanize/` checkout can help instruction discovery, but Claude Code needs the plugin commands registered before `/humanize:*` commands are available.
+
+Install Humanize once inside Claude Code:
+
+```text
+/plugin marketplace add PolyArch/humanize
+/plugin install humanize@PolyArch
+```
+
+If `/humanize:start-rlcr-loop` reports an unknown command, install or update the plugin, restart Claude Code, and retry. The command prefix is `/humanize`; `/hunmanize` is a typo.
+
+{start_instructions}
 
 ## 2. Import The Humanize Round
 
@@ -266,11 +412,15 @@ def build_operator_metadata(
     contract: Path,
     workspace: Path,
     target_repo: Path | None,
+    target_plan: str | None,
     diff_base: str,
     round_number: int,
     bridge_metadata_path: Path,
     operator_doc_path: Path,
     operator_metadata_path: Path,
+    launcher_path: Path | None,
+    preflight_report_path: Path | None,
+    preflight_report: dict[str, Any] | None,
     bridge_metadata: dict[str, Any],
     prepare_command: list[str],
     commands: dict[str, Any],
@@ -285,12 +435,18 @@ def build_operator_metadata(
         "contract": str(contract),
         "workspace": str(workspace),
         "target_repo": str(target_repo) if target_repo is not None else None,
+        "target_plan": target_plan,
+        "execution_mode": "target_repo" if target_repo is not None else "workspace",
         "diff_base": diff_base,
         "round": round_number,
         "prepare_metadata_path": str(bridge_metadata_path),
         "bridge_metadata_path": str(bridge_metadata_path),
         "operator_doc": str(operator_doc_path),
         "operator_metadata": str(operator_metadata_path),
+        "launcher": str(launcher_path) if launcher_path is not None else None,
+        "target_preflight_report": str(preflight_report_path) if preflight_report_path is not None else None,
+        "target_preflight": preflight_report,
+        "plan_sha256": preflight_report.get("plan_sha256") if preflight_report is not None else None,
         "prepare_bridge_schema_version": prepare_bridge_schema_version,
         "repo_commit": bridge_metadata.get("repo_commit"),
         "rlinfrawiki_commit": bridge_metadata.get("rlinfrawiki_commit"),
@@ -312,7 +468,10 @@ def emit_operator_steps(metadata: dict[str, Any], *, stream: Any) -> None:
     print(f"Operator metadata: {metadata['operator_metadata']}", file=stream)
     print("", file=stream)
     print("1. In Claude Code:", file=stream)
-    print(f"   {commands['enter_workspace']}", file=stream)
+    if metadata["execution_mode"] == "target_repo":
+        print(f"   Launch with: {commands['launch_claude']}", file=stream)
+    else:
+        print(f"   {commands['enter_workspace']}", file=stream)
     print(f"   {commands['humanize_start']}", file=stream)
     print("", file=stream)
     print("2. After Humanize writes a round, return to this repo and run:", file=stream)
@@ -330,6 +489,23 @@ def start(args: argparse.Namespace) -> int:
     contract = resolve_cli_path(args.contract, base=cwd)
     workspace = resolve_cli_path(args.workspace, base=cwd)
     target_repo = maybe_resolve_cli_path(args.target_repo, base=cwd)
+    target_plan_arg = getattr(args, "target_plan", None)
+    target_plan = target_plan_arg.strip() if target_plan_arg is not None else None
+    if target_repo is not None and not target_plan:
+        raise StartError("--target-plan is required when --target-repo is provided")
+    if target_repo is None and target_plan:
+        raise StartError("--target-plan requires --target-repo")
+
+    operator_doc_path = (workspace / "humanize_operator.md").resolve()
+    operator_metadata_path = (workspace / ".humanize" / "rlinfra_operator.json").resolve()
+    launcher_path = (workspace / "launch_humanize.sh").resolve() if target_repo is not None else None
+    preflight_report_path = (workspace / TARGET_PREFLIGHT_RELPATH).resolve() if target_repo is not None else None
+    for stale in [operator_doc_path, operator_metadata_path, launcher_path]:
+        if stale is not None and (stale.exists() or stale.is_symlink()):
+            if stale.is_dir() and not stale.is_symlink():
+                raise StartError(f"generated artifact path is a directory; remove it before retrying: {stale}")
+            stale.unlink()
+
     prepare_command = prepare_argv(args, root=root, contract=contract, workspace=workspace, target_repo=target_repo)
 
     prepare_result = run_prepare(prepare_command, root=root, print_json=args.print_json, timeout=args.prepare_timeout)
@@ -340,8 +516,6 @@ def start(args: argparse.Namespace) -> int:
         return prepare_result.returncode
 
     bridge_metadata_path = (workspace / BRIDGE_METADATA_RELPATH).resolve()
-    operator_doc_path = (workspace / "humanize_operator.md").resolve()
-    operator_metadata_path = (workspace / ".humanize" / "rlinfra_operator.json").resolve()
     try:
         bridge_metadata = load_json(bridge_metadata_path)
         prepare_bridge_schema_version = validate_prepare_bridge_schema(bridge_metadata, args.accept_bridge_schema)
@@ -350,17 +524,70 @@ def start(args: argparse.Namespace) -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
+    preflight_report: dict[str, Any] | None = None
+    if target_repo is not None and target_plan is not None:
+        preflight_result, preflight_report, preflight_command = run_target_preflight(
+            root=root,
+            workspace=workspace,
+            target_repo=target_repo,
+            target_plan=target_plan,
+            diff_base=args.diff_base,
+            timeout=args.prepare_timeout,
+        )
+        if preflight_result.stderr:
+            print(preflight_result.stderr, end="", file=sys.stderr)
+        if preflight_result.returncode != 0:
+            print("ERROR: stage target_hygiene_preflight failed", file=sys.stderr)
+            print(f"ERROR: command: {shell_join(preflight_command)}", file=sys.stderr)
+            if preflight_report is not None:
+                for error in preflight_report.get("errors", []):
+                    print(f"ERROR: {error}", file=sys.stderr)
+                for command in preflight_report.get("remediation", []):
+                    print(f"FIX: {command}", file=sys.stderr)
+                print(f"REPORT: {preflight_report.get('report_path', preflight_report_path)}", file=sys.stderr)
+            return TARGET_HYGIENE_EXIT_CODE if preflight_result.returncode == TARGET_HYGIENE_EXIT_CODE else 1
+        if preflight_report is None or preflight_report.get("status") != "passed":
+            print("ERROR: target preflight returned no parseable passed report", file=sys.stderr)
+            return 1
+
+        assert launcher_path is not None
+        assert preflight_report_path is not None
+        launcher_path.write_text(
+            render_launcher(
+                root=root,
+                workspace=workspace,
+                target_repo=target_repo,
+                target_plan=target_plan,
+                diff_base=args.diff_base,
+                report_path=preflight_report_path,
+            ),
+            encoding="utf-8",
+        )
+        launcher_path.chmod(0o755)
+
     created_at = now_iso()
-    commands = build_commands(root=root, workspace=workspace, round_number=args.round, python_executable=sys.executable)
+    commands = build_commands(
+        root=root,
+        workspace=workspace,
+        round_number=args.round,
+        python_executable=sys.executable,
+        target_repo=target_repo,
+        target_plan=target_plan,
+        diff_base=args.diff_base,
+        launcher_path=launcher_path,
+    )
     operator_doc = render_operator_doc(
         created_at=created_at,
         contract=contract,
         workspace=workspace,
         target_repo=target_repo,
+        target_plan=target_plan,
         diff_base=args.diff_base,
         round_number=args.round,
         bridge_metadata_path=bridge_metadata_path,
         operator_metadata_path=operator_metadata_path,
+        launcher_path=launcher_path,
+        preflight_report_path=preflight_report_path,
         commands=commands,
     )
     operator_doc_path.write_text(operator_doc, encoding="utf-8")
@@ -369,11 +596,15 @@ def start(args: argparse.Namespace) -> int:
         contract=contract,
         workspace=workspace,
         target_repo=target_repo,
+        target_plan=target_plan,
         diff_base=args.diff_base,
         round_number=args.round,
         bridge_metadata_path=bridge_metadata_path,
         operator_doc_path=operator_doc_path,
         operator_metadata_path=operator_metadata_path,
+        launcher_path=launcher_path,
+        preflight_report_path=preflight_report_path,
+        preflight_report=preflight_report,
         bridge_metadata=bridge_metadata,
         prepare_command=prepare_command,
         commands=commands,
@@ -396,6 +627,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--contract", required=True, help="Task contract YAML path.")
     parser.add_argument("--workspace", required=True, help="Workspace path to render and prepare.")
     parser.add_argument("--target-repo", default=None, help="Optional target repository path for the Humanize task.")
+    parser.add_argument(
+        "--target-plan",
+        default=None,
+        help="Tracked, clean target-repository plan path; required with --target-repo.",
+    )
     parser.add_argument("--diff-base", type=non_empty_string, default="main", help="Diff base branch for target-repo review context.")
     parser.add_argument("--round", type=positive_int, default=1, help="Humanize round number expected for import.")
     parser.add_argument("--force", action="store_true", help="Allow rendering into an existing workspace.")

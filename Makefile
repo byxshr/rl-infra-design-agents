@@ -1,4 +1,4 @@
-.PHONY: setup validate test status indices validate-ledger validate-source-refs validate-source-drift validate-golden-paths check prepare-humanize-task start-humanize-task import-humanize-round render-example review-gate demo render-slime-grpo-contract review-slime-grpo-contract demo-slime-grpo-contract render-rollout-backend-selection review-rollout-backend-selection demo-rollout-backend-selection render-training-rollout-mismatch-debug review-training-rollout-mismatch-debug demo-training-rollout-mismatch-debug
+.PHONY: setup validate test status indices validate-ledger validate-source-refs validate-source-drift validate-golden-paths check prepare-humanize-task preflight-humanize-target start-humanize-task import-humanize-round render-example review-gate demo render-slime-grpo-contract review-slime-grpo-contract demo-slime-grpo-contract render-rollout-backend-selection review-rollout-backend-selection demo-rollout-backend-selection render-training-rollout-mismatch-debug review-training-rollout-mismatch-debug demo-training-rollout-mismatch-debug
 
 WORKSPACE ?= /tmp/rl-infra-task-workspace
 GRPO_WORKSPACE ?= /tmp/slime-grpo-rlvr-data-contract-workspace
@@ -9,6 +9,8 @@ HUMANIZE_WORKSPACE ?= /tmp/rlinfra-humanize-task-workspace
 HUMANIZE_LOOP_DIR ?=
 ROUND ?= 1
 TARGET_REPO ?=
+TARGET_PLAN ?=
+HUMANIZE_OVERWRITE_DOCS ?=
 DIFF_BASE ?= main
 PYTHON ?= python
 SOURCE_ROOT ?= ..
@@ -53,18 +55,26 @@ prepare-humanize-task:
 	  --workspace "$(HUMANIZE_WORKSPACE)" \
 	  $(if $(TARGET_REPO),--target-repo "$(TARGET_REPO)",) \
 	  --diff-base "$(DIFF_BASE)" \
-	  --force \
-	  --overwrite-human-docs
+	  $(if $(HUMANIZE_OVERWRITE_DOCS),--overwrite-human-docs,) \
+	  --force
+
+preflight-humanize-target:
+	$(PYTHON) scripts/preflight_humanize_target.py \
+	  --target-repo "$(TARGET_REPO)" \
+	  --workspace "$(HUMANIZE_WORKSPACE)" \
+	  --target-plan "$(TARGET_PLAN)" \
+	  --diff-base "$(DIFF_BASE)"
 
 start-humanize-task:
 	$(PYTHON) scripts/start_humanize_task.py \
 	  --contract "$(CONTRACT)" \
 	  --workspace "$(HUMANIZE_WORKSPACE)" \
 	  $(if $(TARGET_REPO),--target-repo "$(TARGET_REPO)",) \
+	  $(if $(TARGET_PLAN),--target-plan "$(TARGET_PLAN)",) \
 	  --diff-base "$(DIFF_BASE)" \
 	  --round "$(ROUND)" \
-	  --force \
-	  --overwrite-human-docs
+	  $(if $(HUMANIZE_OVERWRITE_DOCS),--overwrite-human-docs,) \
+	  --force
 
 import-humanize-round:
 	$(PYTHON) scripts/import_humanize_round.py \

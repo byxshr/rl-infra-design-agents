@@ -13,11 +13,15 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 START = ROOT / "scripts" / "start_humanize_task.py"
+PREPARE = ROOT / "scripts" / "prepare_humanize_task.py"
 CONTRACT = ROOT / "examples" / "task_contracts" / "training-rollout-mismatch-debug.yaml"
+TARGET_PLAN = "docs/superpowers/rlcr/test-plan.md"
 
 
-def run_command(args: list[str], *, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(args, cwd=ROOT, text=True, capture_output=True, env=env)
+def run_command(
+    args: list[str], *, env: dict[str, str] | None = None, cwd: Path = ROOT
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(args, cwd=cwd, text=True, capture_output=True, env=env)
 
 
 def run_start(workspace: Path, *extra: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -49,6 +53,66 @@ def load_start_module():
     return module
 
 
+def git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return run_command(["git", *args], cwd=repo)
+
+
+def prepare_target_mode(tmp_path: Path) -> tuple[Path, Path]:
+    target = tmp_path / "target with spaces"
+    workspace = tmp_path / "workspace"
+    target.mkdir()
+    assert git(target, "init", "-b", "main").returncode == 0
+    assert git(target, "config", "user.email", "imp018@example.com").returncode == 0
+    assert git(target, "config", "user.name", "IMP 018 Test").returncode == 0
+    (target / "README.md").write_text("# Target\n", encoding="utf-8")
+    assert git(target, "add", "README.md").returncode == 0
+    assert git(target, "commit", "-m", "Initialize target").returncode == 0
+
+    prepared = run_command(
+        [
+            sys.executable,
+            str(PREPARE),
+            "--contract",
+            str(CONTRACT),
+            "--workspace",
+            str(workspace),
+            "--target-repo",
+            str(target),
+            "--diff-base",
+            "main",
+            "--force",
+            "--overwrite-human-docs",
+        ]
+    )
+    assert prepared.returncode == 0, prepared.stdout + prepared.stderr
+    target_plan = target / TARGET_PLAN
+    target_plan.parent.mkdir(parents=True)
+    target_plan.write_bytes((workspace / "docs" / "plan.md").read_bytes())
+    assert git(target, "add", TARGET_PLAN).returncode == 0
+    assert git(target, "commit", "-m", "Add RLCR plan").returncode == 0
+    return target, workspace
+
+
+def run_target_start(target: Path, workspace: Path) -> subprocess.CompletedProcess[str]:
+    return run_command(
+        [
+            sys.executable,
+            str(START),
+            "--contract",
+            str(CONTRACT),
+            "--workspace",
+            str(workspace),
+            "--target-repo",
+            str(target),
+            "--target-plan",
+            TARGET_PLAN,
+            "--diff-base",
+            "main",
+            "--force",
+        ]
+    )
+
+
 def test_start_generates_operator_artifacts_and_does_not_create_loop(tmp_path):
     workspace = tmp_path / "workspace"
 
@@ -72,7 +136,8 @@ def test_start_generates_operator_artifacts_and_does_not_create_loop(tmp_path):
     assert "IMP-014 owns this import boundary" in doc_text
 
     metadata = json.loads(operator_metadata.read_text(encoding="utf-8"))
-    assert metadata["schema_version"] == 1
+    assert metadata["schema_version"] == 2
+    assert metadata["execution_mode"] == "workspace"
     assert metadata["contract"] == str(CONTRACT.resolve())
     assert metadata["workspace"] == str(workspace.resolve())
     assert metadata["round"] == 1
@@ -180,6 +245,19 @@ def test_workspace_paths_with_spaces_are_quoted_in_commands(tmp_path):
     assert quoted_workspace in metadata["commands"]["review_gate"]
 
 
+@pytest.mark.parametrize("target", ["prepare-humanize-task", "start-humanize-task"])
+def test_make_humanize_targets_preserve_docs_unless_explicitly_overridden(tmp_path, target):
+    common = ["make", "-n", target, f"HUMANIZE_WORKSPACE={tmp_path / 'workspace'}"]
+
+    default = run_command(common)
+    explicit = run_command([*common, "HUMANIZE_OVERWRITE_DOCS=1"])
+
+    assert default.returncode == 0, default.stdout + default.stderr
+    assert "--overwrite-human-docs" not in default.stdout
+    assert explicit.returncode == 0, explicit.stdout + explicit.stderr
+    assert "--overwrite-human-docs" in explicit.stdout
+
+
 def test_unsupported_bridge_schema_fails_before_operator_doc_write(tmp_path, monkeypatch, capsys):
     module = load_start_module()
     workspace = tmp_path / "workspace"
@@ -195,6 +273,7 @@ def test_unsupported_bridge_schema_fails_before_operator_doc_write(tmp_path, mon
         contract=str(CONTRACT),
         workspace=str(workspace),
         target_repo=None,
+        target_plan=None,
         diff_base="main",
         round=1,
         force=True,
@@ -250,3 +329,124 @@ def test_start_output_includes_three_step_operator_flow(tmp_path):
     assert "make import-humanize-round" in result.stdout
     assert "3. Run the review gate:" in result.stdout
     assert "validate_review_gate.py" in result.stdout
+
+
+def test_target_mode_generates_launcher_and_launches_from_target_root(tmp_path):
+    target, workspace = prepare_target_mode(tmp_path)
+
+    result = run_target_start(target, workspace)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    launcher = workspace / "launch_humanize.sh"
+    metadata_path = workspace / ".humanize" / "rlinfra_operator.json"
+    report_path = workspace / ".humanize" / "rlinfra_target_preflight.json"
+    assert launcher.exists()
+    assert launcher.stat().st_mode & 0o111
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert metadata["schema_version"] == 2
+    assert metadata["execution_mode"] == "target_repo"
+    assert metadata["target_plan"] == TARGET_PLAN
+    assert metadata["target_preflight"]["status"] == "passed"
+    assert metadata["plan_sha256"] == metadata["target_preflight"]["plan_sha256"]
+    assert metadata["commands"]["humanize_start"] == (
+        f"/humanize:start-rlcr-loop {TARGET_PLAN} --track-plan-file --base-branch main"
+    )
+    assert str(target / ".humanize" / "rlcr" / "{{TIMESTAMP}}") in metadata["commands"]["import_round_with_loop_dir"]
+    assert report_path.exists()
+
+    capture = tmp_path / "claude-cwd.txt"
+    fake_claude = tmp_path / "fake-claude.sh"
+    fake_claude.write_text(
+        '#!/usr/bin/env bash\nprintf "%s\\n" "$PWD" > "$RLINFRA_CAPTURE"\nprintf "%s\\n" "$*" >> "$RLINFRA_CAPTURE"\n',
+        encoding="utf-8",
+    )
+    fake_claude.chmod(0o755)
+    env = dict(os.environ)
+    env["RLINFRA_CLAUDE_BIN"] = str(fake_claude)
+    env["RLINFRA_CAPTURE"] = str(capture)
+    launched = run_command([str(launcher), "--resume", "test-session"], cwd=ROOT, env=env)
+    assert launched.returncode == 0, launched.stdout + launched.stderr
+    captured = capture.read_text(encoding="utf-8").splitlines()
+    assert captured == [str(target.resolve()), "--resume test-session"]
+    assert git(target, "status", "--short").stdout == ""
+    assert git(target, "ls-files", "--", ".humanize").stdout == ""
+
+
+def test_target_start_preserves_refined_plan(tmp_path):
+    target, workspace = prepare_target_mode(tmp_path)
+    refinement = "\n## Human Refinement\n\nPreserve this decision.\n"
+    workspace_plan = workspace / "docs" / "plan.md"
+    target_plan = target / TARGET_PLAN
+    refined = workspace_plan.read_text(encoding="utf-8") + refinement
+    workspace_plan.write_text(refined, encoding="utf-8")
+    target_plan.write_text(refined, encoding="utf-8")
+    assert git(target, "add", TARGET_PLAN).returncode == 0
+    assert git(target, "commit", "-m", "Refine RLCR plan").returncode == 0
+
+    result = run_target_start(target, workspace)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert workspace_plan.read_text(encoding="utf-8") == refined
+    report = json.loads(
+        (workspace / ".humanize" / "rlinfra_target_preflight.json").read_text(encoding="utf-8")
+    )
+    assert report["checks"]["target_plan"]["plan_lock_sha256"] == report["plan_sha256"]
+
+
+def test_start_rejects_stale_artifact_directory(tmp_path):
+    workspace = tmp_path / "workspace"
+    stale = workspace / "launch_humanize.sh"
+    stale.mkdir(parents=True)
+
+    result = run_command(
+        [
+            sys.executable,
+            str(START),
+            "--contract",
+            str(CONTRACT),
+            "--workspace",
+            str(workspace),
+            "--target-repo",
+            str(tmp_path / "target"),
+            "--target-plan",
+            TARGET_PLAN,
+            "--force",
+        ]
+    )
+
+    assert result.returncode == 1
+    assert "generated artifact path is a directory" in result.stderr
+
+
+def test_target_preflight_failure_keeps_report_but_removes_stale_operator_artifacts(tmp_path):
+    target, workspace = prepare_target_mode(tmp_path)
+    first = run_target_start(target, workspace)
+    assert first.returncode == 0, first.stdout + first.stderr
+
+    target_plan = target / TARGET_PLAN
+    target_plan.write_text("# Committed but stale plan\n", encoding="utf-8")
+    assert git(target, "add", TARGET_PLAN).returncode == 0
+    assert git(target, "commit", "-m", "Make plan stale").returncode == 0
+
+    result = run_target_start(target, workspace)
+
+    assert result.returncode == 3
+    assert "stage target_hygiene_preflight failed" in result.stderr
+    assert not (workspace / "humanize_operator.md").exists()
+    assert not (workspace / ".humanize" / "rlinfra_operator.json").exists()
+    assert not (workspace / "launch_humanize.sh").exists()
+    report = json.loads((workspace / ".humanize" / "rlinfra_target_preflight.json").read_text(encoding="utf-8"))
+    assert report["status"] == "failed"
+    assert "hash does not match" in report["errors"][0]
+
+
+def test_target_repo_requires_target_plan(tmp_path):
+    workspace = tmp_path / "workspace"
+    target = tmp_path / "target"
+    target.mkdir()
+
+    result = run_start(workspace, "--target-repo", str(target))
+
+    assert result.returncode == 1
+    assert "--target-plan is required" in result.stderr
+    assert not workspace.exists()
