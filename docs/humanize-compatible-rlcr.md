@@ -32,16 +32,9 @@ Both Make targets preserve existing human docs by default. `HUMANIZE_OVERWRITE_D
 
 ## Humanize Plugin Prerequisites
 
-The start wrapper prepares files only. It does not install Humanize or start Claude Code. An explicit `HUMANIZE_PLUGIN_ROOT` is validated and registered by the generated launcher through `--plugin-dir`; without one, Claude Code needs a compatible marketplace plugin installed before `/humanize:*` commands are available.
+The start wrapper prepares files only. It does not install Humanize or start Claude Code. Real target tasks must use a clean local checkout of [`byxshr/humanize`](https://github.com/byxshr/humanize); `HUMANIZE_PLUGIN_ROOT` defaults to the sibling path `../humanize` and may be overridden for another local clone. The wrapper validates the checkout's contract, Git HEAD, cleanliness, and fork remote, then the generated launcher registers it through `claude --plugin-dir`. Target mode does not discover or fall back to a marketplace plugin.
 
-Install Humanize from Claude Code:
-
-```text
-/plugin marketplace add PolyArch/humanize
-/plugin install humanize@PolyArch
-```
-
-If `/humanize:start-rlcr-loop` fails with an unknown command, install or update the plugin, restart Claude Code, and run it again. The command prefix is `/humanize`, not `/hunmanize`.
+Workspace-only design tasks retain installed-plugin discovery for compatibility. That path does not satisfy the real target-task requirement. The command prefix is `/humanize`, not `/hunmanize`.
 
 This is a preparation and instruction step, not an automatic Humanize launch.
 
@@ -79,7 +72,7 @@ conda run -n rl-infra-design-agents make start-humanize-task \
 /humanize:start-rlcr-loop docs/superpowers/rlcr/<task-name>-plan.md --track-plan-file --base-branch <diff-base>
 ```
 
-`start-humanize-task` preserves refined human docs, checks the committed target plan, and validates the selected Humanize runtime against `humanize-gate-invariants-v1`. Use `HUMANIZE_PLUGIN_ROOT=../humanize` for the local development runtime; otherwise the wrapper validates enabled `humanize@PolyArch` from `claude plugin list --json`. Target mode fails closed with exit `2` when the runtime is incompatible. It records a SHA256 contract fingerprint and `static_contract_probe` validation kind in addition to the plugin version, and does not destroy a previously validated operator bundle when a later runtime probe fails. Static compatibility does not prove that the hook executes successfully.
+`start-humanize-task` preserves refined human docs, checks the committed target plan, and validates the selected Humanize runtime against `humanize-gate-invariants-v1`. In target mode it requires the local `byxshr/humanize` fork, fails closed with exit `2` when fork provenance, cleanliness, or contract compatibility fails, and always passes the validated root through `--plugin-dir`. It records the fork remote and Git HEAD together with the SHA256 contract fingerprint, `static_contract_probe` validation kind, and plugin version. A later failed runtime probe does not destroy a previously validated operator bundle. Static compatibility does not prove that the hook executes successfully.
 
 `launch_humanize.sh` repeats the hygiene preflight, starts Claude Code from the target repository root, and forwards optional Claude CLI arguments. The preflight rejects dirty target trees, target-plan/lock drift, unresolved local base branches, or tracked `.humanize/` state. It adds only the anchored `/.humanize/` rule to local `.git/info/exclude` when needed and never changes tracked `.gitignore`. The launcher is an initial clean-tree guard; after implementation edits begin, resume the existing Claude session or launch Claude directly from the target root.
 

@@ -20,6 +20,7 @@ SLASH_COMMAND = "/humanize:start-rlcr-loop docs/plan.md"
 TARGET_PREFLIGHT_RELPATH = Path(".humanize") / "rlinfra_target_preflight.json"
 TARGET_HYGIENE_EXIT_CODE = 3
 PREREQUISITE_EXIT_CODE = 2
+PERSONAL_HUMANIZE_REPOSITORY = "byxshr/humanize"
 
 
 class StartError(Exception):
@@ -283,21 +284,144 @@ def discover_installed_humanize_runtime(*, timeout: int) -> dict[str, Any]:
     }
 
 
-def resolve_humanize_runtime(explicit_root: Path | None, *, timeout: int) -> dict[str, Any]:
-    if explicit_root is None:
+def is_personal_humanize_remote(url: str) -> bool:
+    normalized = url.strip().lower().rstrip("/")
+    if normalized.endswith(".git"):
+        normalized = normalized[:-4]
+    return normalized in {
+        "git@github.com:byxshr/humanize",
+        "ssh://git@github.com/byxshr/humanize",
+        "https://github.com/byxshr/humanize",
+    }
+
+
+def inspect_personal_humanize_fork(root: Path, *, timeout: int) -> dict[str, Any]:
+    resolved_root = root.resolve()
+
+    def git(*args: str) -> subprocess.CompletedProcess[str]:
+        command = ["git", "-C", str(resolved_root), *args]
+        try:
+            return subprocess.run(
+                command,
+                text=True,
+                capture_output=True,
+                timeout=timeout,
+            )
+        except FileNotFoundError:
+            return subprocess.CompletedProcess(command, 127, stdout="", stderr="git executable was not found")
+        except subprocess.TimeoutExpired:
+            return subprocess.CompletedProcess(
+                command,
+                124,
+                stdout="",
+                stderr=f"git command timed out after {timeout} seconds",
+            )
+
+    errors: list[str] = []
+    top_level = git("rev-parse", "--show-toplevel")
+    if top_level.returncode != 0:
+        detail = (top_level.stderr or top_level.stdout).strip() or f"exit code {top_level.returncode}"
+        errors.append(f"Humanize plugin root is not a Git checkout: {detail}")
+        git_root = None
+    else:
+        git_root = str(Path(top_level.stdout.strip()).resolve())
+        if Path(git_root) != resolved_root:
+            errors.append(f"Humanize plugin root must be the Git checkout root: {git_root}")
+
+    remote_result = git("remote", "-v")
+    remote_urls: list[str] = []
+    if remote_result.returncode == 0:
+        for line in remote_result.stdout.splitlines():
+            fields = line.split()
+            if len(fields) >= 2 and fields[1] not in remote_urls:
+                remote_urls.append(fields[1])
+    fork_remotes = [url for url in remote_urls if is_personal_humanize_remote(url)]
+    if not fork_remotes:
+        errors.append(
+            "Humanize checkout has no remote for github.com/byxshr/humanize; "
+            "real target tasks must use the project-maintained fork"
+        )
+
+    head_result = git("rev-parse", "HEAD")
+    git_head = head_result.stdout.strip() if head_result.returncode == 0 else None
+    if not git_head:
+        detail = (head_result.stderr or head_result.stdout).strip() or f"exit code {head_result.returncode}"
+        errors.append(f"could not resolve Humanize checkout HEAD: {detail}")
+
+    status_result = git("status", "--porcelain", "--untracked-files=normal")
+    git_clean = status_result.returncode == 0 and not status_result.stdout.strip()
+    if status_result.returncode != 0:
+        detail = (status_result.stderr or status_result.stdout).strip() or f"exit code {status_result.returncode}"
+        errors.append(f"could not inspect Humanize checkout status: {detail}")
+    elif not git_clean:
+        errors.append("Humanize checkout must be clean before launching a real target task")
+
+    return {
+        "status": "compatible" if not errors else "incompatible",
+        "git_root": git_root,
+        "git_head": git_head,
+        "fork_remotes": fork_remotes,
+        "git_clean": git_clean,
+        "errors": errors,
+    }
+
+
+def resolve_humanize_runtime(
+    explicit_root: Path | None,
+    *,
+    timeout: int,
+    require_personal_fork: bool = False,
+) -> dict[str, Any]:
+    if explicit_root is None and require_personal_fork:
+        runtime = {
+            "runtime_type": "personal_fork",
+            "status": "missing",
+            "root": None,
+            "plugin_id": "humanize",
+            "plugin_version": None,
+            "contract_fingerprint": None,
+            "validation_kind": None,
+            "checker": "explicit local byxshr/humanize fork required",
+            "git_root": None,
+            "git_head": None,
+            "fork_remotes": [],
+            "git_clean": False,
+            "errors": [
+                "real target tasks require --humanize-plugin-root pointing to a clean local "
+                "github.com/byxshr/humanize checkout"
+            ],
+        }
+    elif explicit_root is None:
         runtime = discover_installed_humanize_runtime(timeout=timeout)
     else:
         validation = validate_runtime_root(explicit_root)
+        fork_validation = (
+            inspect_personal_humanize_fork(explicit_root, timeout=timeout)
+            if require_personal_fork and validation["status"] == "compatible"
+            else None
+        )
+        errors = list(validation["errors"])
+        if fork_validation is not None:
+            errors.extend(fork_validation["errors"])
         runtime = {
-            "runtime_type": "explicit_local",
-            "status": validation["status"],
+            "runtime_type": "personal_fork" if require_personal_fork else "explicit_local",
+            "status": "compatible" if validation["status"] == "compatible" and not errors else "incompatible",
             "root": validation["root"],
             "plugin_id": "humanize",
             "plugin_version": validation.get("plugin_version"),
             "contract_fingerprint": validation.get("contract_fingerprint"),
             "validation_kind": validation.get("validation_kind"),
-            "checker": "scripts/validate_humanize_review_contract.py --humanize-root",
-            "errors": validation["errors"],
+            "checker": (
+                "scripts/validate_humanize_review_contract.py --humanize-root + "
+                "local byxshr/humanize Git provenance"
+                if require_personal_fork
+                else "scripts/validate_humanize_review_contract.py --humanize-root"
+            ),
+            "git_root": fork_validation.get("git_root") if fork_validation else None,
+            "git_head": fork_validation.get("git_head") if fork_validation else None,
+            "fork_remotes": fork_validation.get("fork_remotes", []) if fork_validation else [],
+            "git_clean": fork_validation.get("git_clean") if fork_validation else None,
+            "errors": errors,
         }
     return {
         "contract_id": CONTRACT_ID,
@@ -417,6 +541,11 @@ def render_operator_doc(
     target_text = str(target_repo) if target_repo is not None else "not provided"
     target_plan_text = target_plan or "not provided"
     if target_repo is not None:
+        plugin_prerequisites = f"""The start wrapper requires a clean local checkout of the project-maintained
+`{PERSONAL_HUMANIZE_REPOSITORY}` fork, validates it against `{CONTRACT_ID}`, records its Git HEAD and
+remote provenance, and passes it to Claude Code with `--plugin-dir`. It does not fall back to a
+marketplace-installed Humanize runtime for real target tasks.
+"""
         start_instructions = f"""## 1. Launch Claude Code From The Target Repository
 
 The target plan passed strict hygiene checks and matches the prepared `docs/plan.md` byte-for-byte.
@@ -440,6 +569,17 @@ Then run this exact slash command inside Claude Code:
 The tracked plan lives outside `.humanize/`. Keep `.humanize/rlcr/` local-only and never run `git add -f .humanize`.
 """
     else:
+        plugin_prerequisites = f"""Workspace-only mode may validate an explicitly supplied local runtime or
+discover an enabled `humanize@PolyArch` plugin. This compatibility path is for design-only work and
+does not satisfy the local-fork requirement for a real target task.
+
+If `/humanize:start-rlcr-loop` is unavailable in workspace-only mode, install Humanize in Claude Code:
+
+```text
+/plugin marketplace add PolyArch/humanize
+/plugin install humanize@PolyArch
+```
+"""
         start_instructions = f"""## 1. Start Humanize In Claude Code
 
 Open Claude Code in the prepared workspace:
@@ -482,16 +622,7 @@ This workspace was prepared by the IMP-015 start wrapper. It does not start Clau
 
 ## Humanize Plugin Prerequisites
 
-The start wrapper validated the selected Humanize runtime against `{CONTRACT_ID}`. Target mode fails closed if that runtime is unavailable or incompatible.
-
-Install Humanize once inside Claude Code:
-
-```text
-/plugin marketplace add PolyArch/humanize
-/plugin install humanize@PolyArch
-```
-
-If `/humanize:start-rlcr-loop` reports an unknown command, install or update the plugin, restart Claude Code, and retry. The command prefix is `/humanize`; `/hunmanize` is a typo.
+{plugin_prerequisites}
 
 {start_instructions}
 
@@ -664,14 +795,27 @@ def start(args: argparse.Namespace) -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    review_contract = resolve_humanize_runtime(humanize_plugin_root, timeout=min(args.prepare_timeout, 30))
+    review_contract = resolve_humanize_runtime(
+        humanize_plugin_root,
+        timeout=min(args.prepare_timeout, 30),
+        require_personal_fork=target_repo is not None,
+    )
     if review_contract["status"] != "compatible":
         detail = "; ".join(review_contract["errors"]) or "unknown compatibility failure"
         message = f"Humanize runtime is not compatible with {CONTRACT_ID}: {detail}"
         if target_repo is not None or args.strict_prereqs:
             print("ERROR: stage humanize_review_contract failed", file=sys.stderr)
             print(f"ERROR: {message}", file=sys.stderr)
-            print("FIX: pass --humanize-plugin-root /path/to/compatible/humanize or update the installed plugin", file=sys.stderr)
+            if target_repo is not None:
+                print(
+                    "FIX: pass --humanize-plugin-root /path/to/a/clean/byxshr/humanize checkout",
+                    file=sys.stderr,
+                )
+            else:
+                print(
+                    "FIX: pass --humanize-plugin-root /path/to/compatible/humanize or update the installed plugin",
+                    file=sys.stderr,
+                )
             return PREREQUISITE_EXIT_CODE
         print(f"WARN: {message}", file=sys.stderr)
 
@@ -790,7 +934,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--humanize-plugin-root",
         default=None,
-        help="Explicit compatible Humanize plugin root; target launcher passes it to claude --plugin-dir.",
+        help=(
+            "Explicit Humanize plugin root. Real target tasks require a clean local "
+            "github.com/byxshr/humanize checkout and pass it to claude --plugin-dir."
+        ),
     )
     parser.add_argument(
         "--target-plan",

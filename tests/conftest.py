@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -53,4 +54,17 @@ def create_compatible_humanize_runtime(root: Path) -> Path:
 
 @pytest.fixture
 def compatible_humanize_root(tmp_path: Path) -> Path:
-    return create_compatible_humanize_runtime(tmp_path / "compatible-humanize")
+    root = create_compatible_humanize_runtime(tmp_path / "compatible-humanize")
+    subprocess.run(["git", "-C", str(root), "init", "-b", "main"], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(root), "config", "user.email", "humanize-fixture@example.com"],
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(root), "config", "user.name", "Humanize Fixture"], check=True)
+    subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(root), "commit", "-m", "Create compatible Humanize fixture"], check=True)
+    subprocess.run(
+        ["git", "-C", str(root), "remote", "add", "fork", "git@github.com:byxshr/humanize.git"],
+        check=True,
+    )
+    return root

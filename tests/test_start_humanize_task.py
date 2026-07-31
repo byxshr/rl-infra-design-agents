@@ -355,9 +355,12 @@ def test_target_mode_generates_launcher_and_launches_from_target_root(tmp_path, 
     assert metadata["target_preflight"]["status"] == "passed"
     assert metadata["plan_sha256"] == metadata["target_preflight"]["plan_sha256"]
     assert metadata["review_contract"]["status"] == "compatible"
-    assert metadata["review_contract"]["runtime_type"] == "explicit_local"
+    assert metadata["review_contract"]["runtime_type"] == "personal_fork"
     assert metadata["review_contract"]["contract_fingerprint"].startswith("sha256:")
     assert metadata["review_contract"]["validation_kind"] == "static_contract_probe"
+    assert metadata["review_contract"]["git_clean"] is True
+    assert metadata["review_contract"]["git_head"]
+    assert metadata["review_contract"]["fork_remotes"] == ["git@github.com:byxshr/humanize.git"]
     assert metadata["commands"]["humanize_start"] == (
         f"/humanize:start-rlcr-loop {TARGET_PLAN} --track-plan-file --base-branch main"
     )
@@ -467,6 +470,63 @@ def test_target_repo_requires_target_plan(tmp_path):
     assert not workspace.exists()
 
 
+def test_target_mode_requires_explicit_personal_fork(tmp_path):
+    target, workspace = prepare_target_mode(tmp_path)
+
+    result = run_command(
+        [
+            sys.executable,
+            str(START),
+            "--contract",
+            str(CONTRACT),
+            "--workspace",
+            str(workspace),
+            "--target-repo",
+            str(target),
+            "--target-plan",
+            TARGET_PLAN,
+            "--force",
+        ]
+    )
+
+    assert result.returncode == 2
+    assert "real target tasks require --humanize-plugin-root" in result.stderr
+    assert "clean/byxshr/humanize checkout" in result.stderr
+    assert not (workspace / "launch_humanize.sh").exists()
+    assert not (workspace / ".humanize" / "rlinfra_operator.json").exists()
+
+
+def test_target_mode_rejects_compatible_runtime_without_personal_fork_remote(
+    tmp_path, compatible_humanize_root
+):
+    target, workspace = prepare_target_mode(tmp_path)
+    assert git(compatible_humanize_root, "remote", "remove", "fork").returncode == 0
+    assert git(
+        compatible_humanize_root,
+        "remote",
+        "add",
+        "origin",
+        "https://github.com/PolyArch/humanize",
+    ).returncode == 0
+
+    result = run_target_start(target, workspace, compatible_humanize_root)
+
+    assert result.returncode == 2
+    assert "no remote for github.com/byxshr/humanize" in result.stderr
+    assert not (workspace / "launch_humanize.sh").exists()
+
+
+def test_target_mode_rejects_dirty_personal_fork(tmp_path, compatible_humanize_root):
+    target, workspace = prepare_target_mode(tmp_path)
+    (compatible_humanize_root / "LOCAL_CHANGE.md").write_text("dirty\n", encoding="utf-8")
+
+    result = run_target_start(target, workspace, compatible_humanize_root)
+
+    assert result.returncode == 2
+    assert "checkout must be clean" in result.stderr
+    assert not (workspace / "launch_humanize.sh").exists()
+
+
 def test_target_mode_fails_closed_for_incompatible_runtime(tmp_path, compatible_humanize_root):
     target, workspace = prepare_target_mode(tmp_path)
     first = run_target_start(target, workspace, compatible_humanize_root)
@@ -554,3 +614,19 @@ def test_launcher_quotes_explicit_plugin_root_with_spaces(tmp_path, compatible_h
     )
 
     assert f"--plugin-dir '{plugin_root}'" in rendered
+
+
+def test_make_real_task_default_uses_local_humanize_fork(tmp_path):
+    result = run_command(
+        [
+            "make",
+            "-n",
+            "start-humanize-task",
+            f"HUMANIZE_WORKSPACE={tmp_path / 'workspace'}",
+            f"TARGET_REPO={tmp_path / 'target'}",
+            f"TARGET_PLAN={TARGET_PLAN}",
+        ]
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert '--humanize-plugin-root "../humanize"' in result.stdout

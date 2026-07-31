@@ -6,6 +6,8 @@ This repository is a task-agnostic workflow and knowledge-base repository for RL
 
 The default implementation workflow is Humanize-compatible RLCR: Claude implements, Codex independently reviews, and the human remains the architect.
 
+For real target-repository tasks, launch Humanize only through the generated launcher backed by a clean local `byxshr/humanize` checkout. Do not fall back to the marketplace plugin; `HUMANIZE_PLUGIN_ROOT` defaults to the sibling `../humanize` checkout and the launcher must pass it through `claude --plugin-dir`.
+
 ## RLInfraWiki dependency
 
 Use `.agents/skills/RLInfraWiki/` as the RLInfraWiki skill location. It is a standalone repository pinned by the main repo as a submodule-style dependency. `.gitmodules` uses `../RLInfraWiki`, which resolves to the sibling GitHub repository `https://github.com/byxshr/RLInfraWiki` for normal clones of `https://github.com/byxshr/rl-infra-design-agents`. If a local authoring workspace has a custom `.git/config` submodule URL override, run `git submodule sync && git submodule update --init --recursive` to return to the tracked configuration.

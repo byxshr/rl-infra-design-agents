@@ -111,7 +111,7 @@ conda run -n rl-infra-design-agents make start-humanize-task \
   ROUND=1
 ```
 
-`HUMANIZE_PLUGIN_ROOT=../humanize` selects the local development runtime until a marketplace release containing `humanize-gate-invariants-v1` is installed. Without an explicit root, the wrapper resolves enabled `humanize@PolyArch` metadata from `claude plugin list --json` and validates the installed files. Target mode returns exit code `2` without publishing a new launcher/operator bundle when the runtime is missing or incompatible; a previously validated bundle is preserved byte-for-byte. Runtime provenance records both the declared plugin version and a SHA256 fingerprint of the gate-aware contract files. This is a static contract probe, not execution of the Stop hook or proof of runtime capability.
+`HUMANIZE_PLUGIN_ROOT` defaults to the sibling checkout `../humanize`. Real target-repository tasks require this path (or an explicit override) to be a clean Git checkout with a remote for [`byxshr/humanize`](https://github.com/byxshr/humanize). The wrapper never falls back to a marketplace-installed runtime in target mode: it returns exit code `2` without publishing a new launcher/operator bundle when the local fork is absent, dirty, incorrectly sourced, or contract-incompatible. A previously validated bundle is preserved byte-for-byte. Runtime provenance records the fork remote, Git HEAD, declared plugin version, and a SHA256 fingerprint of the gate-aware contract files. This is a static contract probe, not execution of the Stop hook or proof of runtime capability.
 
 The wrapper rerenders generated context while preserving existing human docs, refreshes the plan lock, and validates the workspace. It requires the target plan to be tracked, clean, and byte-identical to both `docs/plan.md` and its plan-lock hash; rejects tracked `.humanize/` state and any other dirty target files; and ensures the root `/.humanize/` path is covered by the target repository's local `.git/info/exclude`. After an intentional scaffold reset, review and recommit the synchronized target plan. It writes:
 
@@ -136,14 +136,7 @@ Then run the exact slash command printed in `humanize_operator.md`:
 /humanize:start-rlcr-loop docs/superpowers/rlcr/<task-name>-plan.md --track-plan-file --base-branch main
 ```
 
-Before using the slash command, make sure Humanize is registered with Claude Code. The generated launcher registers an explicit `HUMANIZE_PLUGIN_ROOT` through `--plugin-dir`; otherwise install it once in Claude Code:
-
-```text
-/plugin marketplace add PolyArch/humanize
-/plugin install humanize@PolyArch
-```
-
-If `/humanize:start-rlcr-loop` reports an unknown command, install or update the plugin, restart Claude Code, and rerun the command. The command prefix is `/humanize` without the extra `n`.
+The generated target launcher always registers the validated local fork through `claude --plugin-dir`; no marketplace installation is used for a real task. If `/humanize:start-rlcr-loop` reports an unknown command, rerun `make start-humanize-task`, inspect the recorded fork provenance, and launch Claude Code through the regenerated `launch_humanize.sh`. The command prefix is `/humanize` without the extra `n`.
 
 For design-only tasks that do not edit a separate target repository, open Claude Code in the prepared workspace:
 
