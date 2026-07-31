@@ -85,6 +85,26 @@ def run_gate(workspace: Path) -> subprocess.CompletedProcess[str]:
     return run_command([sys.executable, str(REVIEW_GATE), "--workspace", str(workspace), "--require-review"])
 
 
+def write_operator_v3(workspace: Path) -> None:
+    path = workspace / ".humanize" / "rlinfra_operator.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 3,
+                "review_contract": {
+                    "contract_id": "humanize-gate-invariants-v1",
+                    "required": True,
+                    "status": "compatible",
+                },
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def test_complete_round_import_creates_artifacts_and_gate_passes(tmp_path, prepared_workspace_template):
     workspace = copy_workspace(prepared_workspace_template, tmp_path)
     loop_dir = write_humanize_round(workspace, review_text="All acceptance criteria are met.\n\nCOMPLETE\n")
@@ -101,7 +121,7 @@ def test_complete_round_import_creates_artifacts_and_gate_passes(tmp_path, prepa
     assert metadata["no_finding"] is True
     assert metadata["issue_count"] == 0
     assert metadata["bridge"]["schema_version"] == 2
-    assert metadata["warnings"] == []
+    assert any("legacy review has no" in warning for warning in metadata["warnings"])
     assert set(metadata["source_files"]) >= {"summary", "review_result", "prompt", "review_prompt", "goal_tracker"}
     assert "No parser-compatible P0-P3 findings" in (round_dir / "codex_review.md").read_text(encoding="utf-8")
 
@@ -125,6 +145,47 @@ def test_v1_bridge_remains_importable(tmp_path, prepared_workspace_template):
         (workspace / "review_rounds" / "round-001" / "humanize_round_metadata.json").read_text(encoding="utf-8")
     )
     assert metadata["bridge"]["schema_version"] == 1
+    assert any("legacy review has no" in warning for warning in metadata["warnings"])
+
+
+def test_operator_v3_requires_gate_verdict_before_any_write(tmp_path, prepared_workspace_template):
+    workspace = copy_workspace(prepared_workspace_template, tmp_path)
+    write_operator_v3(workspace)
+    loop_dir = write_humanize_round(workspace, review_text="COMPLETE\n")
+
+    rejected = run_import(workspace, "--humanize-loop-dir", str(loop_dir), "--round", "1")
+
+    assert rejected.returncode == 1
+    assert "must contain exactly one Humanize Gate Verdict" in rejected.stderr
+    assert not (workspace / "review_rounds" / "round-001").exists()
+    assert (workspace / "review_issues.jsonl").read_text(encoding="utf-8") == ""
+
+    (loop_dir / "round-1-review-result.md").write_text(
+        "No findings.\n\nCOMPLETE\n\nHumanize Gate Verdict: PASS\n",
+        encoding="utf-8",
+    )
+    accepted = run_import(workspace, "--humanize-loop-dir", str(loop_dir), "--round", "1")
+    assert accepted.returncode == 0, accepted.stdout + accepted.stderr
+    metadata = json.loads(
+        (workspace / "review_rounds" / "round-001" / "humanize_round_metadata.json").read_text(encoding="utf-8")
+    )
+    assert metadata["review_contract"]["verdict"] == "PASS"
+    assert metadata["review_contract"]["required"] is True
+
+
+def test_unsafe_review_is_rejected_for_legacy_round_without_partial_write(tmp_path, prepared_workspace_template):
+    workspace = copy_workspace(prepared_workspace_template, tmp_path)
+    loop_dir = write_humanize_round(
+        workspace,
+        review_text="Run git add -f .humanize before continuing.\n\nCOMPLETE\n",
+    )
+
+    result = run_import(workspace, "--humanize-loop-dir", str(loop_dir), "--round", "1")
+
+    assert result.returncode == 1
+    assert "gate-conflicting" in result.stderr
+    assert not (workspace / "review_rounds" / "round-001").exists()
+    assert (workspace / "review_issues.jsonl").read_text(encoding="utf-8") == ""
 
 
 def test_v2_target_bridge_auto_discovers_target_repo_loop(tmp_path, prepared_workspace_template):

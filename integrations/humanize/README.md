@@ -4,7 +4,7 @@ This directory contains templates for a Humanize-compatible RLCR loop. Humanize 
 
 ## Claude Code Prerequisites
 
-The repository can prepare Humanize-compatible workspaces without the Humanize plugin, but Claude Code can only run `/humanize:*` slash commands after the plugin is installed. A local `humanize/` source checkout only helps the bridge discover instruction files; it does not automatically register Claude Code commands.
+The repository can prepare Humanize-compatible workspaces without the Humanize plugin, but Claude Code can only run `/humanize:*` commands after registration. `HUMANIZE_PLUGIN_ROOT=/path/to/humanize` makes the generated launcher register local source with `--plugin-dir`; otherwise install the marketplace plugin.
 
 Install Humanize once inside Claude Code:
 
@@ -57,6 +57,7 @@ make start-humanize-task \
   HUMANIZE_WORKSPACE=/tmp/rlinfra-humanize-task-workspace \
   TARGET_REPO=/path/to/target/repo \
   TARGET_PLAN=docs/superpowers/rlcr/<task-name>-plan.md \
+  HUMANIZE_PLUGIN_ROOT=../humanize \
   DIFF_BASE=<diff-base> \
   ROUND=1
 /tmp/rlinfra-humanize-task-workspace/launch_humanize.sh
@@ -70,7 +71,7 @@ Then run in Claude Code:
 
 Keep `.humanize/rlcr/` local-only. Do not commit round summaries, state files, contracts, or goal trackers, and never use `git add -f .humanize`. Do not use `.humanize/plan.md` with `--track-plan-file`; tracked plans should live in a normal path such as `docs/superpowers/rlcr/...`.
 
-The start wrapper rerenders generated context while preserving refined human docs by default, refreshes the plan lock, verifies that the target plan is tracked, clean, and byte-identical to both `docs/plan.md` and the lock hash, rejects tracked `.humanize/` state and dirty target files, and ensures anchored `/.humanize/` coverage through local `.git/info/exclude`. `HUMANIZE_OVERWRITE_DOCS=1` is an explicit scaffold reset and requires resynchronizing the committed target plan. The wrapper does not start Claude Code automatically. On success it writes `launch_humanize.sh`, `humanize_operator.md`, and `.humanize/rlinfra_operator.json`; the launcher repeats preflight, starts Claude Code with the target repository as its session root, and forwards optional CLI arguments. It is an initial clean-tree guard, not a dirty-tree mid-loop relaunch command. A hygiene failure exits with code `3`, retains `.humanize/rlinfra_target_preflight.json`, and does not generate launcher/operator artifacts.
+The start wrapper rerenders generated context while preserving refined human docs by default, refreshes the plan lock, verifies target hygiene, and validates the selected Humanize runtime against `humanize-gate-invariants-v1`. `HUMANIZE_PLUGIN_ROOT=../humanize` uses local development source and makes the launcher pass `--plugin-dir`; otherwise the wrapper validates enabled `humanize@PolyArch` from `claude plugin list --json`. Runtime identity includes a SHA256 fingerprint of the gate-aware contract files because a development checkout and an older installed plugin may report the same version. This check is recorded as `static_contract_probe`; it does not execute the Stop hook. Target runtime incompatibility exits `2` without publishing a replacement launcher/operator bundle; a prior validated bundle is preserved. Hygiene failure exits `3` and clears invalidated generated artifacts.
 
 Preserve `context/context_bundle.md`, `context/context_bundle.json`, `context/context_sources.yaml`, RLInfraWiki page/source IDs, non-claims, validation evidence, and risk updates through the Humanize loop. Use `.humanize/rlinfra_bridge.json` to recover bridge schema v2, execution mode, main-repo commit, pinned `RLInfraWiki` commit, target repo/diff-base validation status, and command provenance for round import.
 
@@ -82,7 +83,7 @@ make import-humanize-round \
   ROUND=1
 ```
 
-Bridge schema v2 searches only the configured target repository's `.humanize/rlcr/` automatically and never falls back to the staging workspace. If more than one target loop exists, pass `HUMANIZE_LOOP_DIR=/path/to/target/repo/.humanize/rlcr/<timestamp>`; any deliberate cross-root import must also be explicit. The importer remains compatible with bridge schema v1, validates bridge provenance, warns when copied workspace metadata is stale, writes `review_rounds/round-001/`, updates `review_issues.jsonl`, preserves raw Humanize review output, and lets the existing gate reason about imported P0/P1/P2 findings:
+Bridge schema v2 searches only the configured target repository's `.humanize/rlcr/` automatically and never falls back to the staging workspace. Operator schema v3 requires a valid gate verdict before import; legacy v1/v2 reviews without one warn, while any review that tells Claude to track or commit `.humanize/` is rejected before partial writes. Valid imports preserve raw output and let the existing gate reason about P0/P1/P2 findings:
 
 ```bash
 python .agents/skills/RLInfraWiki/scripts/validate_review_gate.py \

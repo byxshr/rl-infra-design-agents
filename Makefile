@@ -1,4 +1,4 @@
-.PHONY: setup validate test status indices validate-ledger validate-source-refs validate-source-drift validate-golden-paths check prepare-humanize-task preflight-humanize-target start-humanize-task import-humanize-round render-example review-gate demo render-slime-grpo-contract review-slime-grpo-contract demo-slime-grpo-contract render-rollout-backend-selection review-rollout-backend-selection demo-rollout-backend-selection render-training-rollout-mismatch-debug review-training-rollout-mismatch-debug demo-training-rollout-mismatch-debug
+.PHONY: setup validate test status indices validate-ledger validate-source-refs validate-source-drift validate-golden-paths validate-humanize-review-contract check prepare-humanize-task preflight-humanize-target start-humanize-task import-humanize-round render-example review-gate demo render-slime-grpo-contract review-slime-grpo-contract demo-slime-grpo-contract render-rollout-backend-selection review-rollout-backend-selection demo-rollout-backend-selection render-training-rollout-mismatch-debug review-training-rollout-mismatch-debug demo-training-rollout-mismatch-debug
 
 WORKSPACE ?= /tmp/rl-infra-task-workspace
 GRPO_WORKSPACE ?= /tmp/slime-grpo-rlvr-data-contract-workspace
@@ -10,6 +10,7 @@ HUMANIZE_LOOP_DIR ?=
 ROUND ?= 1
 TARGET_REPO ?=
 TARGET_PLAN ?=
+HUMANIZE_PLUGIN_ROOT ?=
 HUMANIZE_OVERWRITE_DOCS ?=
 DIFF_BASE ?= main
 PYTHON ?= python
@@ -33,6 +34,10 @@ validate-source-drift:
 validate-golden-paths:
 	$(PYTHON) -m pytest -q tests/test_golden_path_snapshots.py
 
+validate-humanize-review-contract:
+	$(PYTHON) scripts/validate_humanize_review_contract.py \
+	  $(if $(HUMANIZE_PLUGIN_ROOT),--humanize-root "$(HUMANIZE_PLUGIN_ROOT)",)
+
 indices:
 	$(PYTHON) .agents/skills/RLInfraWiki/scripts/generate_indices.py
 
@@ -44,6 +49,7 @@ check:
 	$(PYTHON) .agents/skills/RLInfraWiki/scripts/validate.py
 	$(PYTHON) .agents/skills/RLInfraWiki/scripts/verify_source_refs.py --strict-hash
 	$(PYTHON) scripts/validate_content_ledger.py
+	$(PYTHON) scripts/validate_humanize_review_contract.py
 	$(PYTHON) -m pytest -q
 
 status:
@@ -71,6 +77,7 @@ start-humanize-task:
 	  --workspace "$(HUMANIZE_WORKSPACE)" \
 	  $(if $(TARGET_REPO),--target-repo "$(TARGET_REPO)",) \
 	  $(if $(TARGET_PLAN),--target-plan "$(TARGET_PLAN)",) \
+	  $(if $(HUMANIZE_PLUGIN_ROOT),--humanize-plugin-root "$(HUMANIZE_PLUGIN_ROOT)",) \
 	  --diff-base "$(DIFF_BASE)" \
 	  --round "$(ROUND)" \
 	  $(if $(HUMANIZE_OVERWRITE_DOCS),--overwrite-human-docs,) \

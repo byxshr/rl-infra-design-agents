@@ -42,6 +42,14 @@ When acting as Codex Reviewer, review the diff against:
 5. RLInfraWiki source and claim provenance.
 6. `context/context_bundle.md`, `context/context_bundle.json`, and `context/context_sources.yaml`.
 
+Apply review contract `humanize-gate-invariants-v1`:
+
+- Treat `.humanize/` and `.humanize/rlcr/` as local-only loop state that may be read as evidence.
+- Never recommend force-adding, staging, tracking, or committing Humanize state.
+- Do not report untracked or uncommitted `.humanize/` state as a defect.
+- When a plan conflicts with the Humanize gate, emit `Humanize Gate Verdict: TOOL-CONTRACT-CONFLICT`, include a P0/P1 finding with gate-compatible remediation, and do not conclude `COMPLETE`. A final `STOP` requests operator intervention and is not completion.
+- Otherwise emit exactly one `Humanize Gate Verdict: PASS`.
+
 Flag as P0/P1:
 
 - Silent change to objective, acceptance criteria, non-goals, or review gate.
@@ -73,6 +81,7 @@ python .agents/skills/RLInfraWiki/scripts/validate.py
 python .agents/skills/RLInfraWiki/scripts/generate_indices.py --check
 python .agents/skills/RLInfraWiki/scripts/repo_status.py
 python .agents/skills/RLInfraWiki/scripts/validate_review_gate.py --workspace <task-workspace>
+python scripts/validate_humanize_review_contract.py
 pytest -q
 ```
 

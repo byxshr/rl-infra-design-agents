@@ -106,9 +106,12 @@ conda run -n rl-infra-design-agents make start-humanize-task \
   HUMANIZE_WORKSPACE=/tmp/rlinfra-humanize-task-workspace \
   TARGET_REPO=/path/to/target/repo \
   TARGET_PLAN=docs/superpowers/rlcr/<task-name>-plan.md \
+  HUMANIZE_PLUGIN_ROOT=../humanize \
   DIFF_BASE=main \
   ROUND=1
 ```
+
+`HUMANIZE_PLUGIN_ROOT=../humanize` selects the local development runtime until a marketplace release containing `humanize-gate-invariants-v1` is installed. Without an explicit root, the wrapper resolves enabled `humanize@PolyArch` metadata from `claude plugin list --json` and validates the installed files. Target mode returns exit code `2` without publishing a new launcher/operator bundle when the runtime is missing or incompatible; a previously validated bundle is preserved byte-for-byte. Runtime provenance records both the declared plugin version and a SHA256 fingerprint of the gate-aware contract files. This is a static contract probe, not execution of the Stop hook or proof of runtime capability.
 
 The wrapper rerenders generated context while preserving existing human docs, refreshes the plan lock, and validates the workspace. It requires the target plan to be tracked, clean, and byte-identical to both `docs/plan.md` and its plan-lock hash; rejects tracked `.humanize/` state and any other dirty target files; and ensures the root `/.humanize/` path is covered by the target repository's local `.git/info/exclude`. After an intentional scaffold reset, review and recommit the synchronized target plan. It writes:
 
@@ -133,7 +136,7 @@ Then run the exact slash command printed in `humanize_operator.md`:
 /humanize:start-rlcr-loop docs/superpowers/rlcr/<task-name>-plan.md --track-plan-file --base-branch main
 ```
 
-Before using the slash command, make sure the Humanize Claude Code plugin is installed. A local `humanize/` checkout is not enough by itself; Claude Code must register the plugin commands. In Claude Code, install it once with:
+Before using the slash command, make sure Humanize is registered with Claude Code. The generated launcher registers an explicit `HUMANIZE_PLUGIN_ROOT` through `--plugin-dir`; otherwise install it once in Claude Code:
 
 ```text
 /plugin marketplace add PolyArch/humanize
@@ -172,9 +175,9 @@ conda run -n rl-infra-design-agents python .agents/skills/RLInfraWiki/scripts/va
   --require-review
 ```
 
-The importer validates the bridge schema, copies the Humanize summary/review into `review_rounds/round-001/`, normalizes `[P0]` to `[P3]` findings into parser-compatible headings, preserves the raw Humanize review output, writes `humanize_round_metadata.json` with file hashes, bridge provenance, stale-workspace warnings, and UTF-8 replacement markers, and updates `review_issues.jsonl`. COMPLETE/no-finding rounds satisfy `--require-review`; open P0/P1/P2 findings still block promotion through the existing review gate.
+The importer validates the bridge schema and `humanize-gate-invariants-v1` before any ledger write. Operator schema v3 requires exactly one valid gate verdict; legacy v1/v2 rounds without a verdict warn but remain importable. Explicit guidance to track or commit `.humanize/` is rejected for every schema. Valid reviews are copied into `review_rounds/round-001/`, normalized, preserved raw, and recorded with hashes and provenance before `review_issues.jsonl` is updated.
 
-The operator metadata records schema version, execution mode, target plan/hash, preflight and ignore provenance, launcher, contract, workspace, target repo, diff base, round, prerequisite warnings, and exact prepare/start/import/gate commands. Target hygiene failures return exit code `3`, retain the preflight report, and do not leave stale operator or launcher artifacts. Add `--strict-prereqs` when missing local Humanize/Codex prerequisites should preserve prepare's exit code `2`.
+Operator metadata schema v3 records review-contract ID, runtime type/root/version, contract-file fingerprint, validation kind, checker provenance, execution mode, target plan/hash, preflight and ignore provenance, launcher, and exact commands. Target hygiene failures return exit code `3`; runtime/prerequisite failures return `2`. A hygiene failure clears the invalidated generated bundle, while a runtime failure does not destroy a previously validated bundle and never publishes a replacement.
 
 The lower-level preparation entry remains available when the operator guide is not needed:
 

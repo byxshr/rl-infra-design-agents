@@ -4,6 +4,7 @@ import argparse
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -93,7 +94,9 @@ def prepare_target_mode(tmp_path: Path) -> tuple[Path, Path]:
     return target, workspace
 
 
-def run_target_start(target: Path, workspace: Path) -> subprocess.CompletedProcess[str]:
+def run_target_start(
+    target: Path, workspace: Path, humanize_root: Path
+) -> subprocess.CompletedProcess[str]:
     return run_command(
         [
             sys.executable,
@@ -108,6 +111,8 @@ def run_target_start(target: Path, workspace: Path) -> subprocess.CompletedProce
             TARGET_PLAN,
             "--diff-base",
             "main",
+            "--humanize-plugin-root",
+            str(humanize_root),
             "--force",
         ]
     )
@@ -136,8 +141,9 @@ def test_start_generates_operator_artifacts_and_does_not_create_loop(tmp_path):
     assert "IMP-014 owns this import boundary" in doc_text
 
     metadata = json.loads(operator_metadata.read_text(encoding="utf-8"))
-    assert metadata["schema_version"] == 2
+    assert metadata["schema_version"] == 3
     assert metadata["execution_mode"] == "workspace"
+    assert metadata["review_contract"]["contract_id"] == "humanize-gate-invariants-v1"
     assert metadata["contract"] == str(CONTRACT.resolve())
     assert metadata["workspace"] == str(workspace.resolve())
     assert metadata["round"] == 1
@@ -331,10 +337,10 @@ def test_start_output_includes_three_step_operator_flow(tmp_path):
     assert "validate_review_gate.py" in result.stdout
 
 
-def test_target_mode_generates_launcher_and_launches_from_target_root(tmp_path):
+def test_target_mode_generates_launcher_and_launches_from_target_root(tmp_path, compatible_humanize_root):
     target, workspace = prepare_target_mode(tmp_path)
 
-    result = run_target_start(target, workspace)
+    result = run_target_start(target, workspace, compatible_humanize_root)
 
     assert result.returncode == 0, result.stdout + result.stderr
     launcher = workspace / "launch_humanize.sh"
@@ -343,11 +349,15 @@ def test_target_mode_generates_launcher_and_launches_from_target_root(tmp_path):
     assert launcher.exists()
     assert launcher.stat().st_mode & 0o111
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-    assert metadata["schema_version"] == 2
+    assert metadata["schema_version"] == 3
     assert metadata["execution_mode"] == "target_repo"
     assert metadata["target_plan"] == TARGET_PLAN
     assert metadata["target_preflight"]["status"] == "passed"
     assert metadata["plan_sha256"] == metadata["target_preflight"]["plan_sha256"]
+    assert metadata["review_contract"]["status"] == "compatible"
+    assert metadata["review_contract"]["runtime_type"] == "explicit_local"
+    assert metadata["review_contract"]["contract_fingerprint"].startswith("sha256:")
+    assert metadata["review_contract"]["validation_kind"] == "static_contract_probe"
     assert metadata["commands"]["humanize_start"] == (
         f"/humanize:start-rlcr-loop {TARGET_PLAN} --track-plan-file --base-branch main"
     )
@@ -367,12 +377,15 @@ def test_target_mode_generates_launcher_and_launches_from_target_root(tmp_path):
     launched = run_command([str(launcher), "--resume", "test-session"], cwd=ROOT, env=env)
     assert launched.returncode == 0, launched.stdout + launched.stderr
     captured = capture.read_text(encoding="utf-8").splitlines()
-    assert captured == [str(target.resolve()), "--resume test-session"]
+    assert captured == [
+        str(target.resolve()),
+        f"--plugin-dir {compatible_humanize_root.resolve()} --resume test-session",
+    ]
     assert git(target, "status", "--short").stdout == ""
     assert git(target, "ls-files", "--", ".humanize").stdout == ""
 
 
-def test_target_start_preserves_refined_plan(tmp_path):
+def test_target_start_preserves_refined_plan(tmp_path, compatible_humanize_root):
     target, workspace = prepare_target_mode(tmp_path)
     refinement = "\n## Human Refinement\n\nPreserve this decision.\n"
     workspace_plan = workspace / "docs" / "plan.md"
@@ -383,7 +396,7 @@ def test_target_start_preserves_refined_plan(tmp_path):
     assert git(target, "add", TARGET_PLAN).returncode == 0
     assert git(target, "commit", "-m", "Refine RLCR plan").returncode == 0
 
-    result = run_target_start(target, workspace)
+    result = run_target_start(target, workspace, compatible_humanize_root)
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert workspace_plan.read_text(encoding="utf-8") == refined
@@ -418,9 +431,11 @@ def test_start_rejects_stale_artifact_directory(tmp_path):
     assert "generated artifact path is a directory" in result.stderr
 
 
-def test_target_preflight_failure_keeps_report_but_removes_stale_operator_artifacts(tmp_path):
+def test_target_preflight_failure_keeps_report_but_removes_stale_operator_artifacts(
+    tmp_path, compatible_humanize_root
+):
     target, workspace = prepare_target_mode(tmp_path)
-    first = run_target_start(target, workspace)
+    first = run_target_start(target, workspace, compatible_humanize_root)
     assert first.returncode == 0, first.stdout + first.stderr
 
     target_plan = target / TARGET_PLAN
@@ -428,7 +443,7 @@ def test_target_preflight_failure_keeps_report_but_removes_stale_operator_artifa
     assert git(target, "add", TARGET_PLAN).returncode == 0
     assert git(target, "commit", "-m", "Make plan stale").returncode == 0
 
-    result = run_target_start(target, workspace)
+    result = run_target_start(target, workspace, compatible_humanize_root)
 
     assert result.returncode == 3
     assert "stage target_hygiene_preflight failed" in result.stderr
@@ -450,3 +465,92 @@ def test_target_repo_requires_target_plan(tmp_path):
     assert result.returncode == 1
     assert "--target-plan is required" in result.stderr
     assert not workspace.exists()
+
+
+def test_target_mode_fails_closed_for_incompatible_runtime(tmp_path, compatible_humanize_root):
+    target, workspace = prepare_target_mode(tmp_path)
+    first = run_target_start(target, workspace, compatible_humanize_root)
+    assert first.returncode == 0, first.stdout + first.stderr
+    operator_metadata = workspace / ".humanize" / "rlinfra_operator.json"
+    operator_doc = workspace / "humanize_operator.md"
+    launcher = workspace / "launch_humanize.sh"
+    previous = {
+        operator_metadata: operator_metadata.read_bytes(),
+        operator_doc: operator_doc.read_bytes(),
+        launcher: launcher.read_bytes(),
+    }
+    incompatible = tmp_path / "old-humanize"
+    (incompatible / ".claude-plugin").mkdir(parents=True)
+    (incompatible / ".claude-plugin" / "plugin.json").write_text(
+        '{"name": "humanize", "version": "0.1.0"}\n',
+        encoding="utf-8",
+    )
+
+    result = run_command(
+        [
+            sys.executable,
+            str(START),
+            "--contract",
+            str(CONTRACT),
+            "--workspace",
+            str(workspace),
+            "--target-repo",
+            str(target),
+            "--target-plan",
+            TARGET_PLAN,
+            "--humanize-plugin-root",
+            str(incompatible),
+            "--force",
+        ]
+    )
+
+    assert result.returncode == 2
+    assert "stage humanize_review_contract failed" in result.stderr
+    assert "humanize-gate-invariants-v1" in result.stderr
+    assert (workspace / ".humanize" / "rlinfra_bridge.json").exists()
+    for path, content in previous.items():
+        assert path.read_bytes() == content
+
+
+def test_installed_runtime_discovery_validates_enabled_plugin(monkeypatch, compatible_humanize_root):
+    module = load_start_module()
+    payload = json.dumps(
+        [
+            {
+                "id": "humanize@PolyArch",
+                "version": "1.16.0-dev",
+                "enabled": True,
+                "installPath": str(compatible_humanize_root),
+            }
+        ]
+    )
+
+    monkeypatch.setattr(
+        module.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, stdout=payload, stderr=""),
+    )
+
+    runtime = module.discover_installed_humanize_runtime(timeout=5)
+
+    assert runtime["status"] == "compatible"
+    assert runtime["runtime_type"] == "installed_plugin"
+    assert runtime["plugin_id"] == "humanize@PolyArch"
+    assert runtime["contract_fingerprint"].startswith("sha256:")
+
+
+def test_launcher_quotes_explicit_plugin_root_with_spaces(tmp_path, compatible_humanize_root):
+    module = load_start_module()
+    plugin_root = tmp_path / "humanize plugin"
+    shutil.copytree(compatible_humanize_root, plugin_root)
+    rendered = module.render_launcher(
+        root=ROOT,
+        workspace=tmp_path / "workspace",
+        target_repo=tmp_path / "target repo",
+        target_plan=TARGET_PLAN,
+        diff_base="main",
+        report_path=tmp_path / "report.json",
+        plugin_root=plugin_root,
+    )
+
+    assert f"--plugin-dir '{plugin_root}'" in rendered

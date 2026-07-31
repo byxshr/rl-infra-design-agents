@@ -11,13 +11,15 @@ from pathlib import Path
 from typing import Any
 
 from prepare_humanize_task import BRIDGE_METADATA_RELPATH, BRIDGE_SCHEMA_VERSION as PREPARE_BRIDGE_SCHEMA_VERSION
+from validate_humanize_review_contract import CONTRACT_ID, validate_runtime_root
 
 
-OPERATOR_SCHEMA_VERSION = 2
+OPERATOR_SCHEMA_VERSION = 3
 SUPPORTED_PREPARE_BRIDGE_SCHEMA_VERSIONS = frozenset({PREPARE_BRIDGE_SCHEMA_VERSION})
 SLASH_COMMAND = "/humanize:start-rlcr-loop docs/plan.md"
 TARGET_PREFLIGHT_RELPATH = Path(".humanize") / "rlinfra_target_preflight.json"
 TARGET_HYGIENE_EXIT_CODE = 3
+PREREQUISITE_EXIT_CODE = 2
 
 
 class StartError(Exception):
@@ -176,6 +178,134 @@ def run_target_preflight(
     return result, report, argv
 
 
+def discover_installed_humanize_runtime(*, timeout: int) -> dict[str, Any]:
+    command = ["claude", "plugin", "list", "--json"]
+    try:
+        result = subprocess.run(command, text=True, capture_output=True, timeout=timeout)
+    except FileNotFoundError:
+        return {
+            "runtime_type": "installed_plugin",
+            "status": "missing",
+            "root": None,
+            "plugin_id": "humanize@PolyArch",
+            "plugin_version": None,
+            "contract_fingerprint": None,
+            "checker": "claude plugin list --json",
+            "errors": ["claude executable was not found while discovering humanize@PolyArch"],
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "runtime_type": "installed_plugin",
+            "status": "missing",
+            "root": None,
+            "plugin_id": "humanize@PolyArch",
+            "plugin_version": None,
+            "contract_fingerprint": None,
+            "checker": "claude plugin list --json",
+            "errors": [f"claude plugin discovery timed out after {timeout} seconds"],
+        }
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip() or f"exit code {result.returncode}"
+        return {
+            "runtime_type": "installed_plugin",
+            "status": "missing",
+            "root": None,
+            "plugin_id": "humanize@PolyArch",
+            "plugin_version": None,
+            "contract_fingerprint": None,
+            "checker": "claude plugin list --json",
+            "errors": [f"claude plugin discovery failed: {detail}"],
+        }
+    try:
+        plugins = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        return {
+            "runtime_type": "installed_plugin",
+            "status": "missing",
+            "root": None,
+            "plugin_id": "humanize@PolyArch",
+            "plugin_version": None,
+            "contract_fingerprint": None,
+            "checker": "claude plugin list --json",
+            "errors": [f"claude plugin list returned invalid JSON: {exc}"],
+        }
+    if not isinstance(plugins, list):
+        return {
+            "runtime_type": "installed_plugin",
+            "status": "missing",
+            "root": None,
+            "plugin_id": "humanize@PolyArch",
+            "plugin_version": None,
+            "contract_fingerprint": None,
+            "checker": "claude plugin list --json",
+            "errors": ["claude plugin list JSON must be an array"],
+        }
+    matches = [
+        plugin
+        for plugin in plugins
+        if isinstance(plugin, dict) and plugin.get("id") == "humanize@PolyArch" and plugin.get("enabled") is True
+    ]
+    if len(matches) != 1:
+        return {
+            "runtime_type": "installed_plugin",
+            "status": "missing",
+            "root": None,
+            "plugin_id": "humanize@PolyArch",
+            "plugin_version": None,
+            "contract_fingerprint": None,
+            "checker": "claude plugin list --json",
+            "errors": [f"expected one enabled humanize@PolyArch plugin, found {len(matches)}"],
+        }
+    plugin = matches[0]
+    install_path = plugin.get("installPath")
+    if not isinstance(install_path, str) or not install_path.strip():
+        return {
+            "runtime_type": "installed_plugin",
+            "status": "missing",
+            "root": None,
+            "plugin_id": "humanize@PolyArch",
+            "plugin_version": plugin.get("version"),
+            "contract_fingerprint": None,
+            "checker": "claude plugin list --json",
+            "errors": ["enabled humanize@PolyArch plugin has no installPath"],
+        }
+    validation = validate_runtime_root(Path(install_path))
+    return {
+        "runtime_type": "installed_plugin",
+        "status": validation["status"],
+        "root": validation["root"],
+        "plugin_id": plugin.get("id"),
+        "plugin_version": plugin.get("version") or validation.get("plugin_version"),
+        "contract_fingerprint": validation.get("contract_fingerprint"),
+        "validation_kind": validation.get("validation_kind"),
+        "checker": "claude plugin list --json + scripts/validate_humanize_review_contract.py",
+        "errors": validation["errors"],
+    }
+
+
+def resolve_humanize_runtime(explicit_root: Path | None, *, timeout: int) -> dict[str, Any]:
+    if explicit_root is None:
+        runtime = discover_installed_humanize_runtime(timeout=timeout)
+    else:
+        validation = validate_runtime_root(explicit_root)
+        runtime = {
+            "runtime_type": "explicit_local",
+            "status": validation["status"],
+            "root": validation["root"],
+            "plugin_id": "humanize",
+            "plugin_version": validation.get("plugin_version"),
+            "contract_fingerprint": validation.get("contract_fingerprint"),
+            "validation_kind": validation.get("validation_kind"),
+            "checker": "scripts/validate_humanize_review_contract.py --humanize-root",
+            "errors": validation["errors"],
+        }
+    return {
+        "contract_id": CONTRACT_ID,
+        "required": True,
+        **runtime,
+    }
+
+
 def build_commands(
     *,
     root: Path,
@@ -238,6 +368,7 @@ def render_launcher(
     target_plan: str,
     diff_base: str,
     report_path: Path,
+    plugin_root: Path | None,
 ) -> str:
     preflight = shell_join(
         [
@@ -255,12 +386,15 @@ def render_launcher(
             str(report_path),
         ]
     )
+    claude_args = ""
+    if plugin_root is not None:
+        claude_args = f" --plugin-dir {shlex.quote(str(plugin_root))}"
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 
 {preflight}
 cd {shlex.quote(str(target_repo))}
-exec "${{RLINFRA_CLAUDE_BIN:-claude}}" "$@"
+exec "${{RLINFRA_CLAUDE_BIN:-claude}}"{claude_args} "$@"
 """
 
 
@@ -277,6 +411,7 @@ def render_operator_doc(
     operator_metadata_path: Path,
     launcher_path: Path | None,
     preflight_report_path: Path | None,
+    review_contract: dict[str, Any],
     commands: dict[str, Any],
 ) -> str:
     target_text = str(target_repo) if target_repo is not None else "not provided"
@@ -339,11 +474,15 @@ This workspace was prepared by the IMP-015 start wrapper. It does not start Clau
 - Operator metadata: `{operator_metadata_path}`
 - Target preflight report: `{preflight_report_path or 'not applicable'}`
 - Claude launcher: `{launcher_path or 'not applicable'}`
+- Review contract: `{review_contract["contract_id"]}` ({review_contract["status"]})
+- Humanize runtime: `{review_contract.get("runtime_type")}` at `{review_contract.get("root") or 'not found'}`
+- Contract fingerprint: `{review_contract.get("contract_fingerprint") or 'unavailable'}`
+- Runtime validation kind: `{review_contract.get("validation_kind") or 'unavailable'}`
 - Plan: `docs/plan.md`
 
 ## Humanize Plugin Prerequisites
 
-This guide does not prove the Humanize Claude Code plugin is installed. A local `humanize/` checkout can help instruction discovery, but Claude Code needs the plugin commands registered before `/humanize:*` commands are available.
+The start wrapper validated the selected Humanize runtime against `{CONTRACT_ID}`. Target mode fails closed if that runtime is unavailable or incompatible.
 
 Install Humanize once inside Claude Code:
 
@@ -425,6 +564,7 @@ def build_operator_metadata(
     prepare_command: list[str],
     commands: dict[str, Any],
     prepare_bridge_schema_version: int,
+    review_contract: dict[str, Any],
 ) -> dict[str, Any]:
     prereq_warnings = bridge_metadata.get("prereq_warnings", [])
     if not isinstance(prereq_warnings, list):
@@ -453,6 +593,7 @@ def build_operator_metadata(
         "context_paths": bridge_metadata.get("context_paths", {}),
         "plan_lock": bridge_metadata.get("plan_lock"),
         "prereq_warnings": prereq_warnings,
+        "review_contract": review_contract,
         "commands": {
             "prepare": shell_join(prepare_command),
             **commands,
@@ -489,6 +630,7 @@ def start(args: argparse.Namespace) -> int:
     contract = resolve_cli_path(args.contract, base=cwd)
     workspace = resolve_cli_path(args.workspace, base=cwd)
     target_repo = maybe_resolve_cli_path(args.target_repo, base=cwd)
+    humanize_plugin_root = maybe_resolve_cli_path(getattr(args, "humanize_plugin_root", None), base=cwd)
     target_plan_arg = getattr(args, "target_plan", None)
     target_plan = target_plan_arg.strip() if target_plan_arg is not None else None
     if target_repo is not None and not target_plan:
@@ -500,11 +642,9 @@ def start(args: argparse.Namespace) -> int:
     operator_metadata_path = (workspace / ".humanize" / "rlinfra_operator.json").resolve()
     launcher_path = (workspace / "launch_humanize.sh").resolve() if target_repo is not None else None
     preflight_report_path = (workspace / TARGET_PREFLIGHT_RELPATH).resolve() if target_repo is not None else None
-    for stale in [operator_doc_path, operator_metadata_path, launcher_path]:
-        if stale is not None and (stale.exists() or stale.is_symlink()):
-            if stale.is_dir() and not stale.is_symlink():
-                raise StartError(f"generated artifact path is a directory; remove it before retrying: {stale}")
-            stale.unlink()
+    for artifact in [operator_doc_path, operator_metadata_path, launcher_path]:
+        if artifact is not None and artifact.is_dir() and not artifact.is_symlink():
+            raise StartError(f"generated artifact path is a directory; remove it before retrying: {artifact}")
 
     prepare_command = prepare_argv(args, root=root, contract=contract, workspace=workspace, target_repo=target_repo)
 
@@ -523,6 +663,23 @@ def start(args: argparse.Namespace) -> int:
         print("ERROR: stage operator_metadata failed", file=sys.stderr)
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
+
+    review_contract = resolve_humanize_runtime(humanize_plugin_root, timeout=min(args.prepare_timeout, 30))
+    if review_contract["status"] != "compatible":
+        detail = "; ".join(review_contract["errors"]) or "unknown compatibility failure"
+        message = f"Humanize runtime is not compatible with {CONTRACT_ID}: {detail}"
+        if target_repo is not None or args.strict_prereqs:
+            print("ERROR: stage humanize_review_contract failed", file=sys.stderr)
+            print(f"ERROR: {message}", file=sys.stderr)
+            print("FIX: pass --humanize-plugin-root /path/to/compatible/humanize or update the installed plugin", file=sys.stderr)
+            return PREREQUISITE_EXIT_CODE
+        print(f"WARN: {message}", file=sys.stderr)
+
+    for stale in [operator_doc_path, operator_metadata_path, launcher_path]:
+        if stale is not None and (stale.exists() or stale.is_symlink()):
+            if stale.is_dir() and not stale.is_symlink():
+                raise StartError(f"generated artifact path is a directory; remove it before retrying: {stale}")
+            stale.unlink()
 
     preflight_report: dict[str, Any] | None = None
     if target_repo is not None and target_plan is not None:
@@ -560,6 +717,7 @@ def start(args: argparse.Namespace) -> int:
                 target_plan=target_plan,
                 diff_base=args.diff_base,
                 report_path=preflight_report_path,
+                plugin_root=humanize_plugin_root,
             ),
             encoding="utf-8",
         )
@@ -588,6 +746,7 @@ def start(args: argparse.Namespace) -> int:
         operator_metadata_path=operator_metadata_path,
         launcher_path=launcher_path,
         preflight_report_path=preflight_report_path,
+        review_contract=review_contract,
         commands=commands,
     )
     operator_doc_path.write_text(operator_doc, encoding="utf-8")
@@ -609,6 +768,7 @@ def start(args: argparse.Namespace) -> int:
         prepare_command=prepare_command,
         commands=commands,
         prepare_bridge_schema_version=prepare_bridge_schema_version,
+        review_contract=review_contract,
     )
     write_json(operator_metadata_path, metadata)
 
@@ -627,6 +787,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--contract", required=True, help="Task contract YAML path.")
     parser.add_argument("--workspace", required=True, help="Workspace path to render and prepare.")
     parser.add_argument("--target-repo", default=None, help="Optional target repository path for the Humanize task.")
+    parser.add_argument(
+        "--humanize-plugin-root",
+        default=None,
+        help="Explicit compatible Humanize plugin root; target launcher passes it to claude --plugin-dir.",
+    )
     parser.add_argument(
         "--target-plan",
         default=None,

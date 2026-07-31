@@ -60,8 +60,9 @@ Last validated commands:
 | command | result |
 |---|---|
 | `git submodule update --init --recursive` | Passed in the authoring workspace. The standalone remote now exists at `https://github.com/byxshr/RLInfraWiki`; a fresh remote clone should resolve `.gitmodules` URL `../RLInfraWiki` to the sibling GitHub repository after the main repo commit is pushed. |
-| `conda run -n rl-infra-design-agents make check` | Passed: generated query indices current, RLInfraWiki validation passed, strict SourcePack hash validation passed, content ledger validation passed, golden path snapshot tests passed, `145 passed`. |
-| Humanize-focused tests in the four root test modules | Passed: `61 tests`; includes prepare/start default-preservation behavior, refined-plan preservation, synthetic git target hygiene, plan-lock validation, schema-stable dirty-tree reporting with raw space/Unicode paths, remediation-failure report safety, bridge/operator schema v2, v1 import compatibility, target-only loop discovery, strict non-active ambiguity, and fake Claude launcher cwd/argument smoke with a target path containing spaces. |
+| `conda run -n rl-infra-design-agents make check` | Passed: generated query indices current, RLInfraWiki validation passed, strict SourcePack hash validation passed, content ledger validation passed, policy-only `humanize-gate-invariants-v1` validation warned that no runtime root was supplied, golden path snapshot tests passed, `157 passed`. |
+| Humanize-focused tests in the five root test modules | Passed: `73 tests`; includes target hygiene, bridge v1/v2 compatibility, operator schema v3, runtime discovery/validation, contract fingerprints, shared guidance-corpus compatibility, policy-only warning behavior, launcher `--plugin-dir` quoting, strict verdict import, legacy warning behavior, and no-partial-write rejection of gate-conflicting review output. |
+| `python scripts/validate_humanize_review_contract.py --humanize-root ../humanize` | Passed against the local Humanize source runtime with shared-corpus validation, `static_contract_probe`, and contract fingerprint `sha256:8d88a5833551485d55cc735946884ae1e5b60b89cde128a2358dc88f23136405`. The installed marketplace `humanize@PolyArch` 1.16.0 predates this contract and is not claimed compatible despite reporting the same version. |
 | `python scripts/validate_content_ledger.py` | Passed: `docs/rlinfrawiki-content-status.md` matches the pinned `RLInfraWiki` page IDs, paths, status enums, themes, source IDs, and review-ready structure checks. |
 | `conda run -n rl-infra-design-agents make validate-golden-paths` | Passed: `8 passed`; four golden paths render into temporary workspaces, pass review gate, keep context sidecars, retain key semantic anchors, and enforce runtime-claim guard behavior. |
 | `conda run -n rl-infra-design-agents make demo` | Passed: check, render, review gate, P0 query; printed workspace/context paths. |
@@ -194,8 +195,8 @@ IMP-018 upgrades real target-repository startup from a workspace hint to a check
 - `prepare-humanize-task` renders a staging workspace; the generated target-mode guide no longer tells operators to launch Claude Code from `/tmp`.
 - The target plan must be copied to a normal repository path, committed, clean, and byte-identical to the staged `docs/plan.md`.
 - `preflight_humanize_target.py` rejects unsafe plan paths, stale plan locks, unresolved local base branches, dirty targets, bridge metadata mismatch, and tracked or staged `.humanize/` state. Both prepare and start preserve human docs by default. When needed, preflight adds anchored `/.humanize/` to local `.git/info/exclude` before later plan/tree checks, so that local-only write can remain even when a subsequent check fails; it does not edit tracked `.gitignore` or target source files.
-- `start-humanize-task` preserves refined human docs by default and returns exit code `3` for target hygiene failures. On success it writes `launch_humanize.sh`, which repeats preflight, starts Claude Code with the target repository as its session root, and forwards CLI arguments.
-- Bridge/operator metadata use schema v2. Round import remains compatible with schema v1; v2 target mode searches only the target repository automatically and requires an explicit path for any cross-root import.
+- `start-humanize-task` validates the selected Humanize runtime against `humanize-gate-invariants-v1`. Target runtime failures return `2`; hygiene failures return `3`. An explicit local root is passed to Claude through `--plugin-dir`. Runtime provenance includes a deterministic SHA256 contract fingerprint so identical declared versions do not imply identical compatibility, and records the check as `static_contract_probe`.
+- Bridge metadata remains schema v2. Operator metadata is schema v3 and records contract/runtime/fingerprint/checker provenance. Round import remains compatible with v1/v2 metadata, but schema v3 requires a valid gate verdict and every schema rejects explicit guidance to track or commit `.humanize/`. Runtime validation and the Humanize shell gate share one safe/unsafe guidance corpus; failed runtime revalidation does not delete the last validated operator bundle.
 
 ## Current Limitations
 
@@ -203,7 +204,9 @@ IMP-018 upgrades real target-repository startup from a workspace hint to a check
 - P0 content is source-backed through local code/docs/source refs, but no GPU or multi-node NCCL smoke run has been executed.
 - No real distributed training, SGLang/Megatron runtime integration, NCCL group update, or performance benchmark has been locally verified.
 - P1 framework/content tracks are still mostly source summaries or dictionary-level contracts, not runtime-validated implementations.
-- The IMP-018 launcher was verified with a synthetic git target and fake Claude executable. A real Claude Code/Humanize Stop-hook round has not yet been rerun with this implementation.
+- The IMP-020 launcher/import path was verified with synthetic targets, fake Claude/Codex, and local Humanize source. A real Claude Code/Humanize Stop-hook round has not yet been rerun with this implementation.
+- Runtime compatibility is a static file/marker/corpus probe. It identifies and fingerprints the selected contract bytes but does not execute the Stop hook or prove end-to-end plugin capability.
+- Humanize's IMP-020-specific shell suites and `claude plugin validate .` passed. The repository's Bash-4 parallel test runner cannot run under macOS system Bash 3.2, and an equivalent serial run still exposes pre-existing platform/tool assumptions such as GNU `sed`, `timeout`, `sha256sum`, and unrelated legacy test expectations.
 - Bare base-environment `pytest` exited with code 139; `conda run -n rl-infra-design-agents pytest -q` is the validated test runner.
 
 ## Recommended Next Work
@@ -213,9 +216,10 @@ Use `docs/project-improvement-status.md` as the source of truth for detailed ite
 1. Keep standalone `RLInfraWiki/` validation and main repo `make demo` green when changing the submodule.
 2. Watch GitHub Actions after each push; fix submodule, dependency, or review-gate drift before expanding content.
 3. Keep all four golden paths green in CI after each submodule pointer update.
-4. Implement IMP-020 gate-aware Codex review prompts, then IMP-021 external-validation handoff, before the next real Humanize pilot.
-5. Rerun a real target-repository Humanize loop through the generated launcher and retain the preflight, Stop-hook, and review artifacts as pilot evidence.
-6. Promote the remaining P1 Wiki tracks from `docs/rlinfrawiki-content-status.md`, starting with training backend comparison and then review-ready hardening for async agentic RL/Ray orchestration.
+4. Implement IMP-021 external-validation handoff, then IMP-022 AC-weighted progress and IMP-019 bounded review retry.
+5. Publish or install a Humanize runtime containing `humanize-gate-invariants-v1`; until then use `HUMANIZE_PLUGIN_ROOT=../humanize`.
+6. Rerun a real target-repository Humanize loop through the generated launcher and retain the preflight, Stop-hook, verdict, and import artifacts as pilot evidence.
+7. Promote the remaining P1 Wiki tracks from `docs/rlinfrawiki-content-status.md`.
 
 ## Developer Notes
 

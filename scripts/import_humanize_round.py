@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from validate_humanize_review_contract import CONTRACT_ID, validate_review_text
+
 
 ROUND_FILE_RE = re.compile(r"round-(\d+)-(summary|review-result|prompt|review-prompt|contract)\.md$")
 TIMESTAMP_DIR_RE = re.compile(r"^\d{4}-\d{2}-\d{2}[_T]\d{2}[-:]\d{2}[-:]\d{2}")
@@ -23,6 +25,8 @@ NO_FINDING_RE = re.compile(
     re.IGNORECASE | re.MULTILINE,
 )
 SUPPORTED_BRIDGE_SCHEMA_VERSIONS = frozenset({1, 2})
+OPERATOR_METADATA_RELPATH = Path(".humanize") / "rlinfra_operator.json"
+GATE_AWARE_OPERATOR_SCHEMA_VERSION = 3
 
 
 class ImportErrorWithMessage(Exception):
@@ -58,6 +62,50 @@ def load_json(path: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ImportErrorWithMessage(f"bridge metadata must be a JSON object: {path}")
     return data
+
+
+def load_optional_operator_metadata(workspace: Path) -> tuple[dict[str, Any] | None, Path]:
+    path = workspace / OPERATOR_METADATA_RELPATH
+    if not path.exists():
+        return None, path
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ImportErrorWithMessage(f"operator metadata is not valid JSON: {path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise ImportErrorWithMessage(f"operator metadata must be a JSON object: {path}")
+    return data, path
+
+
+def validate_import_review_contract(
+    review_text: str,
+    operator: dict[str, Any] | None,
+) -> tuple[dict[str, Any], list[str]]:
+    warnings: list[str] = []
+    operator_schema = operator.get("schema_version") if operator is not None else None
+    review_contract = operator.get("review_contract") if operator is not None else None
+    require_verdict = (
+        operator_schema == GATE_AWARE_OPERATOR_SCHEMA_VERSION
+        and isinstance(review_contract, dict)
+        and review_contract.get("required") is True
+    )
+    if operator_schema == GATE_AWARE_OPERATOR_SCHEMA_VERSION and not require_verdict:
+        raise ImportErrorWithMessage(
+            f"operator schema v{GATE_AWARE_OPERATOR_SCHEMA_VERSION} must require review contract {CONTRACT_ID}"
+        )
+    validation = validate_review_text(review_text, require_verdict=require_verdict)
+    if not validation.valid:
+        raise ImportErrorWithMessage(
+            f"Humanize review violates {CONTRACT_ID}: " + "; ".join(validation.errors)
+        )
+    warnings.extend(validation.warnings)
+    return {
+        "contract_id": CONTRACT_ID,
+        "required": require_verdict,
+        "status": "valid",
+        "verdict": validation.verdict,
+        "operator_schema_version": operator_schema,
+    }, warnings
 
 
 def validate_bridge(bridge: dict[str, Any], workspace: Path, accepted_schema_versions: set[int]) -> list[str]:
@@ -332,12 +380,15 @@ def import_round(args: argparse.Namespace) -> int:
     bridge_path = workspace / ".humanize" / "rlinfra_bridge.json"
     bridge = load_json(bridge_path)
     bridge_warnings = validate_bridge(bridge, workspace, set(args.accept_bridge_schema))
+    operator, operator_path = load_optional_operator_metadata(workspace)
     loop_dir = discover_loop_dir(workspace, args.humanize_loop_dir, bridge)
     round_number = discover_round(loop_dir, args.round)
     summary_path, review_path = required_round_files(loop_dir, round_number)
     review_text = review_path.read_text(encoding="utf-8", errors="replace")
     if not review_text.strip():
         raise ImportErrorWithMessage(f"Humanize review result is empty: {review_path}")
+    review_contract, contract_warnings = validate_import_review_contract(review_text, operator)
+    bridge_warnings.extend(contract_warnings)
     findings = extract_findings(review_text)
     no_finding = not findings and is_no_finding_review(review_text)
     if not findings and not no_finding:
@@ -384,6 +435,11 @@ def import_round(args: argparse.Namespace) -> int:
             "target_repo": bridge.get("target_repo"),
             "diff_base": bridge.get("diff_base"),
         },
+        "operator": {
+            "path": str(operator_path) if operator is not None else None,
+            "schema_version": operator.get("schema_version") if operator is not None else None,
+        },
+        "review_contract": review_contract,
         "source_files": source_files,
         "warnings": bridge_warnings,
         "allow_overwrite": bool(args.allow_overwrite),
